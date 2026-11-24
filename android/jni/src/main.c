@@ -2,7 +2,11 @@
  * DX Garden for Android, native side.
  *
  * A2: the globe (OpenGL ES 3) with the bundled station list. Hold the
- * crosshair over a place and it plays. The log goes to
+ * crosshair over a place and it plays.
+ * A3: it keeps playing in the background and with the screen off, with
+ * the media session (Playback.kt) for the notification, lock screen and
+ * headset buttons. In the background nothing is drawn: the loop only keeps
+ * the player going and answers commands. The log goes to
  * log-<version>-b<build>.txt in the app's external files folder and to
  * logcat (tag DXGarden).
  *
@@ -23,6 +27,7 @@
  *                     point under a pixel), stats (tile cache), quit
  *   --verbose         (accepted; the log always goes to logcat)
  */
+#include <jni.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,6 +55,18 @@ static library lib;
 static config cfg;
 static int cur_station = -1;
 static double fixed_time;   /* --time, or 0 for now */
+static const char *test_url; /* --play */
+static int paused;          /* paused by the user: cur_station resumes on play */
+static int in_background;   /* not on screen: no drawing (GL is not ours) */
+/* Commands from Playback.kt, queued by any thread, run by the loop. */
+#define CMD_QUEUE 16
+static SDL_Mutex *cmd_lock;
+static int cmd_queue[CMD_QUEUE], cmd_count;
+
+/* Commands from Playback.kt (its CMD_ constants). */
+enum { CMD_PLAY = 1, CMD_PAUSE, CMD_STOP, CMD_NEXT, CMD_PREVIOUS };
+/* States for Playback.kt (its state constants). */
+enum { PB_STOPPED, PB_CONNECTING, PB_PLAYING, PB_PAUSED, PB_ERROR };
 
 static const char *state_name(player_state s)
 {
@@ -207,6 +224,156 @@ static int playing_station(void)
     return cur_station;
 }
 
+/* From any thread (Playback.kt, on Android's main thread): queue a command
+ * for the loop, which takes it within 100 ms even in the background. */
+JNIEXPORT void JNICALL Java_systems_hiraeth_dxgarden_Playback_nativeCommand(JNIEnv *env, jclass cls,
+                                                                            jint cmd)
+{
+    (void)env;
+    (void)cls;
+    if (!cmd_lock)
+        return;
+    SDL_LockMutex(cmd_lock);
+    if (cmd_count < CMD_QUEUE)
+        cmd_queue[cmd_count++] = cmd;
+    SDL_UnlockMutex(cmd_lock);
+}
+
+static int next_command(void)
+{
+    int cmd = 0;
+    SDL_LockMutex(cmd_lock);
+    if (cmd_count > 0) {
+        cmd = cmd_queue[0];
+        memmove(cmd_queue, cmd_queue + 1, (size_t)--cmd_count * sizeof(int));
+    }
+    SDL_UnlockMutex(cmd_lock);
+    return cmd;
+}
+
+/* The next (step 1) or previous (-1) station at the playing station's place,
+ * round in a circle. */
+static int step_station(int step)
+{
+    const station *s;
+    const place *pl;
+    int i;
+    if (cur_station < 0 || cur_station >= lib.stations.count)
+        return -1;
+    s = &lib.stations.items[cur_station];
+    if (s->place < 0 || s->place >= lib.n_places)
+        return -1;
+    pl = &lib.places[s->place];
+    for (i = 0; i < pl->n_stations; i++)
+        if (pl->stations[i] == cur_station)
+            return pl->stations[(i + step + pl->n_stations) % pl->n_stations];
+    return -1;
+}
+
+static void command(int cmd)
+{
+    player_status st;
+    player_get_status(&st);
+    switch (cmd) {
+    case CMD_PLAY:
+        LOG("command: play");
+        if (st.state != PLAYER_IDLE && st.state != PLAYER_ERROR && st.state != PLAYER_STOPPING)
+            break;
+        paused = 0;
+        if (cur_station >= 0)
+            play_station(cur_station);
+        else if (test_url)
+            player_start(test_url, PREBUFFER_BYTES);
+        else if (globeview_candidate() >= 0 && lib.places[globeview_candidate()].n_stations)
+            play_station(lib.places[globeview_candidate()].stations[0]);
+        break;
+    case CMD_PAUSE:
+        LOG("command: pause");
+        /* A live stream can't wait: pausing stops it, playing again
+         * reconnects to the same station. */
+        if (cur_station >= 0 || test_url) {
+            paused = 1;
+            player_stop();
+        }
+        break;
+    case CMD_STOP:
+        LOG("command: stop");
+        paused = 0;
+        cur_station = -1;
+        test_url = NULL;
+        player_stop();
+        break;
+    case CMD_NEXT:
+    case CMD_PREVIOUS: {
+        int si = step_station(cmd == CMD_NEXT ? 1 : -1);
+        LOG("command: %s", cmd == CMD_NEXT ? "next" : "previous");
+        if (si >= 0) {
+            paused = 0;
+            play_station(si);
+        }
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+/* Tells Playback.kt when what it shows changes: the state, the station,
+ * the title playing (or the error) and the place. */
+static void report_playback(const player_status *st)
+{
+    static int last_state = -1;
+    static char last[1024];
+    char name[256] = "", detail[256] = "", where[256] = "", key[1024];
+    int state;
+    if (cur_station >= 0 && cur_station < lib.stations.count) {
+        const station *s = &lib.stations.items[cur_station];
+        SDL_strlcpy(name, s->name, sizeof(name));
+        if (s->place >= 0 && s->place < lib.n_places) {
+            const place *pl = &lib.places[s->place];
+            if (pl->country[0] && !pl->country_wide)
+                SDL_snprintf(where, sizeof(where), "%s, %s", pl->name, pl->country);
+            else
+                SDL_strlcpy(where, pl->country[0] ? pl->country : pl->name, sizeof(where));
+        }
+    } else if (test_url) {
+        SDL_strlcpy(name, st->icy_name[0] ? st->icy_name : test_url, sizeof(name));
+    }
+    switch (st->state) {
+    case PLAYER_PLAYING:
+        state = PB_PLAYING;
+        break;
+    case PLAYER_CONNECTING:
+    case PLAYER_BUFFERING:
+    case PLAYER_RECONNECTING:
+        state = PB_CONNECTING;
+        break;
+    case PLAYER_ERROR:
+        state = PB_ERROR;
+        break;
+    case PLAYER_STOPPING:
+        /* Between two stations (next, or a new place) the old stream stops
+         * first: still connecting as far as the notification goes. */
+        state = paused ? PB_PAUSED : (cur_station >= 0 || test_url) ? PB_CONNECTING : PB_STOPPED;
+        break;
+    default:
+        state = paused ? PB_PAUSED : PB_STOPPED;
+        break;
+    }
+    if (!name[0])
+        state = PB_STOPPED;
+    if (state == PB_ERROR)
+        SDL_strlcpy(detail, st->error, sizeof(detail));
+    else if (state == PB_PLAYING)
+        SDL_strlcpy(detail, st->title, sizeof(detail));
+    SDL_snprintf(key, sizeof(key), "%s\x1f%s\x1f%s", name, detail, where);
+    if (state == last_state && strcmp(key, last) == 0)
+        return;
+    last_state = state;
+    SDL_strlcpy(last, key, sizeof(last));
+    bridge_playback(state, name, detail, where);
+}
+
 /* ---- the app's lifecycle ---- */
 
 /* SDL 3 doesn't queue the background and foreground events: they go only to
@@ -218,12 +385,15 @@ static bool SDLCALL lifecycle(void *ud, SDL_Event *e)
     switch (e->type) {
     case SDL_EVENT_WILL_ENTER_BACKGROUND:
         LOG("app: going to the background");
+        in_background = 1;
         save_config();
         /* The GL context is still current here (SDL lets it go after). */
         earth_trim();
         break;
     case SDL_EVENT_DID_ENTER_FOREGROUND:
+        /* SDL has made the GL context current again by now. */
         LOG("app: back in the foreground");
+        in_background = 0;
         break;
     case SDL_EVENT_LOW_MEMORY:
         LOG("app: low memory");
@@ -383,11 +553,15 @@ int main(int argc, char *argv[])
 
     /* Touches come as finger events only; no pretend mouse. */
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+    /* Keep running when the app is paused (in the background, or the screen
+     * off), so the player goes on; audio isn't paused either. */
+    SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "0");
     SDL_SetAppMetadata("DX Garden", DXG_VERSION, "systems.hiraeth.dxgarden");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return 1;
     }
+    cmd_lock = SDL_CreateMutex();
     dir = data_dir();
     open_log();
     LOG("DX Garden %s (build %s), Android (API %d), SDL %d.%d.%d, data in %s", DXG_VERSION,
@@ -442,6 +616,7 @@ int main(int argc, char *argv[])
 
     if (url) {
         LOG("play: %s%s", url, seconds ? " (test run)" : "");
+        test_url = url;
         player_start(url, PREBUFFER_BYTES);
     }
     start_ms = SDL_GetTicks();
@@ -452,6 +627,10 @@ int main(int argc, char *argv[])
         Uint64 now;
         int w, h;
         SDL_GetWindowSizeInPixels(win, &w, &h);
+        /* In the background, wait for events (or 100 ms) instead of
+         * drawing: enough to keep the player and its reconnects going. */
+        if (in_background)
+            SDL_Delay(100);
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
             case SDL_EVENT_QUIT:
@@ -470,6 +649,8 @@ int main(int argc, char *argv[])
                 break;
             }
         }
+        for (i = next_command(); i; i = next_command())
+            command(i);
         player_update();
         player_get_status(&st);
         if (st.state == PLAYER_PLAYING)
@@ -478,6 +659,7 @@ int main(int argc, char *argv[])
             LOG("state: %s -> %s", state_name(last_state), state_name(st.state));
             last_state = st.state;
         }
+        report_playback(&st);
         now = SDL_GetTicks();
         if (now >= next_status_ms) {
             if (seconds || st.state != PLAYER_IDLE)
@@ -487,6 +669,10 @@ int main(int argc, char *argv[])
         if (seconds && (now - start_ms >= (Uint64)seconds * 1000 || st.state == PLAYER_ERROR))
             running = 0;
 
+        if (in_background) {
+            /* No GL context: don't draw. Scripts wait too. */
+            continue;
+        }
         glViewport(0, 0, w, h);
         globeview_frame(w, h, SDL_GetWindowDisplayScale(win), fixed_time);
         frame++;
@@ -515,6 +701,13 @@ int main(int argc, char *argv[])
     }
     save_config();
     player_shutdown();
+    {
+        player_status idle;
+        SDL_zero(idle);
+        cur_station = -1;
+        test_url = NULL;
+        report_playback(&idle);
+    }
     curl_global_cleanup();
     globeview_shutdown();
     library_free(&lib);

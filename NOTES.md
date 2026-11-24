@@ -181,7 +181,22 @@ carries straight on once its headless checks pass.
   listen with the screen off.
 - **A4. The interface.** Compose over the globe: search, bottom sheet, mini
   player, Now Playing, Browse, Favourites, Recent, Settings, the landscape
-  and tablet layout, predictive back, TalkBack labels.
+  and tablet layout, predictive back, TalkBack labels. An About page
+  (asked for 2026-11-24): app name, version, build, a short description,
+  and the author's name and email. Confirm the exact name and email with
+  Aisling before the A4 build. The About page also carries this
+  dedication, word for word, in its three paragraphs (asked for
+  2026-11-24):
+
+  > This small garden of voices is dedicated to Emma, Max and Phoebe, my
+  > family, and to Imi and John, my dearest friends.
+  >
+  > Like stations drifting across the dial at night, so much in this world
+  > arrives and fades away. You are the ones that stay.
+  >
+  > Wherever I wander on this turning earth, through every distant city
+  > and quiet sea of static, my heart returns to you, the way a river
+  > returns to the ocean, gently and always.
   **[me]** The whole interface, before it's polished further.
 - **A5. Your stations.** First-run copy of the bundled list, `import/`,
   Add Station by URL, Open with DX Garden, Download Station List.
@@ -586,6 +601,82 @@ To reproduce gestures headless, the test script gained synthetic fingers
   where tiles are thin and meet at the edge of NASA's source pieces.
 - The phone was locked during the last test run, so build 9's tile counts
   were checked only on the emulator.
+
+## A3: background playback (builds 10 to 13, 2026-11-24)
+
+**What it does now.** The station keeps playing when you leave the app or
+turn the screen off. While something is playing there is a media
+notification (station, the title playing, the place) with play/pause,
+previous, next and stop. The same controls are on the lock screen, the
+quick settings media player, headset buttons and Bluetooth (AVRCP). The
+build number ("0.9.0 · build 13") is in the bottom-left corner of the
+globe, clear of the navigation bar, until the A4 interface has an About
+page.
+
+**How, in plain terms:**
+- Only Android's own media APIs (`android.media.session.MediaSession`,
+  `Notification.MediaStyle`), so no new library. AndroidX Media3 would
+  have meant several new libraries for nothing we need yet.
+- `PlaybackService` is a foreground service of type `mediaPlayback`. It
+  runs only while a station is connecting, playing, paused or showing an
+  error, and goes when you press stop. Media notifications tied to a
+  session don't need the notification permission (Android 13+), so the app
+  doesn't ask for it.
+- `Playback.kt` holds the session, audio focus, the "headphones
+  unplugged" receiver and the locks. Native code reports what's playing
+  (`bridge_playback`, via `MainActivity.playbackUpdate`, only when
+  something changes); the session's buttons go back to native code through
+  `Playback.nativeCommand`, into a small locked queue the main loop
+  empties every pass. (Build 10 used SDL user events for this, and in deep
+  doze one command in eight was lost; the queue fixed it in build 12.)
+- SDL is told not to block when the activity pauses
+  (`SDL_HINT_ANDROID_BLOCK_ON_PAUSE` "0"), so the loop and audio go on.
+  In the background nothing is drawn (the GL context isn't ours then): the
+  loop wakes every 100 ms to run commands and the player's reconnects.
+  Drawing comes back on return, with the tiles reloaded.
+- **Pause stops the stream**, and play reconnects to the same station: a
+  live stream can't wait. Next and previous step through the stations of
+  the place playing, round in a circle.
+- **Audio focus:** a call or another app's short sound pauses, and play
+  resumes when it's over. Another app starting to play pauses and stays
+  paused. Navigation prompts and similar lower our volume (Android does
+  that itself). Pressing play during a call asks for focus again, so it
+  doesn't play over the call. Unplugging headphones pauses.
+- **Locks:** a partial wake lock and a Wi-Fi lock only while connecting or
+  playing. Wi-Fi locks do nothing from Android 14 on but help on 13.
+- **Swiping the app away from Recents stops playback** and ends the
+  service: the player lives in the activity's native thread. Radio Garden
+  and most radio apps keep playing instead. Making it keep going would
+  mean moving the player out of SDL's thread. Aisling can ask for it.
+
+**Checked headless:**
+- Emulator (API 36):
+  - Plays on in the background, with the screen off, and in forced deep
+    doze (frames out still rising).
+  - Pause, play, next, previous and stop through `cmd media_session
+    dispatch`: all eight commands arrived in doze with the screen off.
+  - The session (`dumpsys media_session`: active, PLAYING, metadata) and
+    the foreground service (`isForeground=true`, type mediaPlayback).
+  - A ringing call (`adb emu gsm call`) paused, and cancelling it
+    resumed.
+  - Returning to the app draws again.
+  - Removing the task stops playback, ends the service and the process.
+- Phone (build 13):
+  - Plays in the background with the screen off.
+  - Pause and play from the session; stop ends the service.
+  - 119 MB PSS while playing in the background.
+
+**Not checked (needs a person or a device):** how the notification and
+lock screen look; Bluetooth and wired headset buttons; unplugging
+headphones; a real call; a long listen with the screen off (whether
+Samsung's battery management leaves it alone); Android Auto (not
+supported yet: it needs a MediaBrowserService, a later question).
+
+**Known issues:**
+- The notification has no artwork: station logos aren't shown anywhere
+  yet.
+- While paused, the globe still marks the paused station's place as
+  playing.
 
 ---
 
