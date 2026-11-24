@@ -37,6 +37,7 @@
 #include <SDL3/SDL_main.h>
 #include <curl/curl.h>
 
+#include "app.h"
 #include "bridge.h"
 #include "config.h"
 #include "earth.h"
@@ -46,6 +47,7 @@
 #include "log.h"
 #include "player.h"
 #include "station_source.h"
+#include "userlist.h"
 
 #define RING_BYTES (2 * 1024 * 1024) /* about 2 minutes at 128 kbps */
 #define PREBUFFER_BYTES (64 * 1024)  /* about 4 s at 128 kbps */
@@ -58,13 +60,21 @@ static double fixed_time;   /* --time, or 0 for now */
 static const char *test_url; /* --play */
 static int paused;          /* paused by the user: cur_station resumes on play */
 static int in_background;   /* not on screen: no drawing (GL is not ours) */
-/* Commands from Playback.kt, queued by any thread, run by the loop. */
-#define CMD_QUEUE 16
-static SDL_Mutex *cmd_lock;
-static int cmd_queue[CMD_QUEUE], cmd_count;
+static SDL_AtomicInt lib_ready; /* the library has loaded */
+static SDL_AtomicInt globe_left; /* px on the left covered by the panel */
+static size_t prebuffer_bytes = PREBUFFER_BYTES;
 
-/* Commands from Playback.kt (its CMD_ constants). */
-enum { CMD_PLAY = 1, CMD_PAUSE, CMD_STOP, CMD_NEXT, CMD_PREVIOUS };
+/* Commands from the interface, queued by any thread, run by the loop. */
+#define CMD_QUEUE 32
+static SDL_Mutex *cmd_lock;
+static struct {
+    int cmd, arg;
+} cmd_queue[CMD_QUEUE];
+static int cmd_count;
+
+/* favourites.txt and recent.txt, by stream URL. */
+static SDL_Mutex *lists_lock;
+static userlist favs, recent;
 /* States for Playback.kt (its state constants). */
 enum { PB_STOPPED, PB_CONNECTING, PB_PLAYING, PB_PAUSED, PB_ERROR };
 
@@ -208,6 +218,93 @@ static void save_config(void)
     SDL_free(tmp);
 }
 
+/* ---- favourites and recent ---- */
+
+static void load_list(userlist *l, const char *name)
+{
+    char *path = data_path(name);
+    size_t len = 0;
+    char *buf = SDL_LoadFile(path, &len);
+    userlist_init(l);
+    if (buf) {
+        userlist_parse(l, buf, len);
+        SDL_free(buf);
+    }
+    SDL_free(path);
+}
+
+/* Called with lists_lock held. */
+static void save_list(const userlist *l, const char *name, const char *header)
+{
+    char *path = data_path(name), *tmp;
+    char *text = userlist_serialize(l, header);
+    SDL_asprintf(&tmp, "%s.new", path);
+    if (!(text && SDL_SaveFile(tmp, text, strlen(text)) && rename(tmp, path) == 0))
+        LOG("lists: could not save %s", path);
+    free(text);
+    SDL_free(tmp);
+    SDL_free(path);
+}
+
+const library *app_library(void)
+{
+    return SDL_GetAtomicInt(&lib_ready) ? &lib : NULL;
+}
+
+void app_set_globe_left(int px)
+{
+    SDL_SetAtomicInt(&globe_left, px > 0 ? px : 0);
+}
+
+int app_list(int which, int *out, int max)
+{
+    const userlist *l = which ? &recent : &favs;
+    int i, n = 0;
+    if (!app_library())
+        return 0;
+    SDL_LockMutex(lists_lock);
+    for (i = 0; i < l->count && n < max; i++) {
+        int si = library_find_url(&lib, l->urls[i]);
+        if (si >= 0)
+            out[n++] = si;
+    }
+    SDL_UnlockMutex(lists_lock);
+    return n;
+}
+
+int app_list_count(int which)
+{
+    int n;
+    SDL_LockMutex(lists_lock);
+    n = which ? recent.count : favs.count;
+    SDL_UnlockMutex(lists_lock);
+    return n;
+}
+
+int app_is_favourite(int si)
+{
+    int r;
+    if (!app_library() || si < 0 || si >= lib.stations.count)
+        return 0;
+    SDL_LockMutex(lists_lock);
+    r = userlist_index(&favs, lib.stations.items[si].url) >= 0;
+    SDL_UnlockMutex(lists_lock);
+    return r;
+}
+
+int app_toggle_favourite(int si)
+{
+    int r;
+    if (!app_library() || si < 0 || si >= lib.stations.count)
+        return 0;
+    SDL_LockMutex(lists_lock);
+    r = userlist_toggle(&favs, lib.stations.items[si].url);
+    save_list(&favs, "favourites.txt", FAVOURITES_HEADER);
+    SDL_UnlockMutex(lists_lock);
+    LOG("favourites: %s %s", r ? "added" : "removed", lib.stations.items[si].name);
+    return r;
+}
+
 /* ---- playing ---- */
 
 static void play_station(int si)
@@ -216,7 +313,11 @@ static void play_station(int si)
         return;
     cur_station = si;
     LOG("play: %s <%s>", lib.stations.items[si].name, lib.stations.items[si].url);
-    player_start(lib.stations.items[si].url, PREBUFFER_BYTES);
+    player_start(lib.stations.items[si].url, prebuffer_bytes);
+    SDL_LockMutex(lists_lock);
+    userlist_push_front(&recent, lib.stations.items[si].url, RECENT_MAX);
+    save_list(&recent, "recent.txt", RECENT_HEADER);
+    SDL_UnlockMutex(lists_lock);
 }
 
 static int playing_station(void)
@@ -231,21 +332,30 @@ JNIEXPORT void JNICALL Java_systems_hiraeth_dxgarden_Playback_nativeCommand(JNIE
 {
     (void)env;
     (void)cls;
+    app_command(cmd, 0);
+}
+
+void app_command(int cmd, int arg)
+{
     if (!cmd_lock)
         return;
     SDL_LockMutex(cmd_lock);
-    if (cmd_count < CMD_QUEUE)
-        cmd_queue[cmd_count++] = cmd;
+    if (cmd_count < CMD_QUEUE) {
+        cmd_queue[cmd_count].cmd = cmd;
+        cmd_queue[cmd_count].arg = arg;
+        cmd_count++;
+    }
     SDL_UnlockMutex(cmd_lock);
 }
 
-static int next_command(void)
+static int next_command(int *arg)
 {
     int cmd = 0;
     SDL_LockMutex(cmd_lock);
     if (cmd_count > 0) {
-        cmd = cmd_queue[0];
-        memmove(cmd_queue, cmd_queue + 1, (size_t)--cmd_count * sizeof(int));
+        cmd = cmd_queue[0].cmd;
+        *arg = cmd_queue[0].arg;
+        memmove(cmd_queue, cmd_queue + 1, (size_t)--cmd_count * sizeof(cmd_queue[0]));
     }
     SDL_UnlockMutex(cmd_lock);
     return cmd;
@@ -270,7 +380,7 @@ static int step_station(int step)
     return -1;
 }
 
-static void command(int cmd)
+static void command(int cmd, int arg)
 {
     player_status st;
     player_get_status(&st);
@@ -283,7 +393,7 @@ static void command(int cmd)
         if (cur_station >= 0)
             play_station(cur_station);
         else if (test_url)
-            player_start(test_url, PREBUFFER_BYTES);
+            player_start(test_url, prebuffer_bytes);
         else if (globeview_candidate() >= 0 && lib.places[globeview_candidate()].n_stations)
             play_station(lib.places[globeview_candidate()].stations[0]);
         break;
@@ -313,6 +423,31 @@ static void command(int cmd)
         }
         break;
     }
+    case CMD_PLAY_STATION:
+        if (arg >= 0 && arg < lib.stations.count) {
+            LOG("command: play station %d", arg);
+            paused = 0;
+            test_url = NULL;
+            play_station(arg);
+            globeview_show_place(lib.stations.items[arg].place, 0);
+        }
+        break;
+    case CMD_SHOW_PLACE:
+        if (arg >= 0 && arg < lib.n_places) {
+            LOG("command: show place %d", arg);
+            paused = 0;
+            test_url = NULL;
+            globeview_show_place(arg, 1);
+        }
+        break;
+    case CMD_PREBUFFER:
+        if (arg >= CONFIG_PREBUFFER_KB_MIN && arg <= CONFIG_PREBUFFER_KB_MAX) {
+            prebuffer_bytes = (size_t)arg * 1024;
+            config_set_int(&cfg, "player", "prebuffer_kb", arg);
+            player_set_prebuffer(prebuffer_bytes);
+            LOG("command: prebuffer %d KB", arg);
+        }
+        break;
     default:
         break;
     }
@@ -322,7 +457,7 @@ static void command(int cmd)
  * the title playing (or the error) and the place. */
 static void report_playback(const player_status *st)
 {
-    static int last_state = -1;
+    static int last_state = -1, last_station = -2;
     static char last[1024];
     char name[256] = "", detail[256] = "", where[256] = "", key[1024];
     int state;
@@ -367,11 +502,12 @@ static void report_playback(const player_status *st)
     else if (state == PB_PLAYING)
         SDL_strlcpy(detail, st->title, sizeof(detail));
     SDL_snprintf(key, sizeof(key), "%s\x1f%s\x1f%s", name, detail, where);
-    if (state == last_state && strcmp(key, last) == 0)
+    if (state == last_state && cur_station == last_station && strcmp(key, last) == 0)
         return;
     last_state = state;
+    last_station = cur_station;
     SDL_strlcpy(last, key, sizeof(last));
-    bridge_playback(state, name, detail, where);
+    bridge_playback(state, state == PB_STOPPED ? -1 : cur_station, name, detail, where);
 }
 
 /* ---- the app's lifecycle ---- */
@@ -562,6 +698,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     cmd_lock = SDL_CreateMutex();
+    lists_lock = SDL_CreateMutex();
     dir = data_dir();
     open_log();
     LOG("DX Garden %s (build %s), Android (API %d), SDL %d.%d.%d, data in %s", DXG_VERSION,
@@ -600,14 +737,22 @@ int main(int argc, char *argv[])
     SDL_GL_SetSwapInterval(1);
 
     load_config();
+    prebuffer_bytes = (size_t)config_get_int(&cfg, "player", "prebuffer_kb",
+                                             CONFIG_PREBUFFER_KB_DEFAULT, CONFIG_PREBUFFER_KB_MIN,
+                                             CONFIG_PREBUFFER_KB_MAX) * 1024;
     first_run_copy();
     load_library();
+    load_list(&favs, "favourites.txt");
+    load_list(&recent, "recent.txt");
+    LOG("lists: %d favourites, %d recent", favs.count, recent.count);
     hooks.play = play_station;
     hooks.playing = playing_station;
     hooks.label = bridge_globe_label;
     hooks.tick = bridge_haptic_tick;
     globeview_init(&lib, &cfg, &hooks, "earth-day.pack", "earth-night.pack");
     SDL_AddEventWatch(lifecycle, NULL);
+    SDL_SetAtomicInt(&lib_ready, 1);
+    bridge_library_ready(lib.stations.count);
     if (go) {
         double a, b, c;
         if (sscanf(go, "%lf %lf %lf", &a, &b, &c) == 3)
@@ -617,7 +762,7 @@ int main(int argc, char *argv[])
     if (url) {
         LOG("play: %s%s", url, seconds ? " (test run)" : "");
         test_url = url;
-        player_start(url, PREBUFFER_BYTES);
+        player_start(url, prebuffer_bytes);
     }
     start_ms = SDL_GetTicks();
     next_status_ms = start_ms + (seconds ? 1000 : 5000);
@@ -625,8 +770,14 @@ int main(int argc, char *argv[])
     while (running) {
         SDL_Event e;
         Uint64 now;
-        int w, h;
+        int w, h, gx, gw;
         SDL_GetWindowSizeInPixels(win, &w, &h);
+        /* The globe's part of the window: all of it, less the side panel in
+         * landscape, so the crosshair is in the middle of what you see. */
+        gx = SDL_GetAtomicInt(&globe_left);
+        if (gx > w / 2)
+            gx = w / 2;
+        gw = w - gx;
         /* In the background, wait for events (or 100 ms) instead of
          * drawing: enough to keep the player and its reconnects going. */
         if (in_background)
@@ -645,12 +796,18 @@ int main(int argc, char *argv[])
                 LOG("app: window %dx%d px", e.window.data1, e.window.data2);
                 break;
             default:
-                globeview_event(&e, w, h);
+                if (gx && (e.type == SDL_EVENT_FINGER_DOWN || e.type == SDL_EVENT_FINGER_MOTION ||
+                           e.type == SDL_EVENT_FINGER_UP || e.type == SDL_EVENT_FINGER_CANCELED))
+                    e.tfinger.x = (e.tfinger.x * w - gx) / gw;
+                globeview_event(&e, gw, h);
                 break;
             }
         }
-        for (i = next_command(); i; i = next_command())
-            command(i);
+        {
+            int arg;
+            for (i = next_command(&arg); i; i = next_command(&arg))
+                command(i, arg);
+        }
         player_update();
         player_get_status(&st);
         if (st.state == PLAYER_PLAYING)
@@ -673,8 +830,13 @@ int main(int argc, char *argv[])
             /* No GL context: don't draw. Scripts wait too. */
             continue;
         }
-        glViewport(0, 0, w, h);
-        globeview_frame(w, h, SDL_GetWindowDisplayScale(win), fixed_time);
+        if (gx) {
+            glViewport(0, 0, w, h);
+            glClearColor(0, 0, 0, 1);
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+        glViewport(gx, 0, gw, h);
+        globeview_frame(gw, h, SDL_GetWindowDisplayScale(win), fixed_time);
         frame++;
         if (trace_frames > 0) {
             double la, lo, al;
@@ -710,7 +872,10 @@ int main(int argc, char *argv[])
     }
     curl_global_cleanup();
     globeview_shutdown();
+    SDL_SetAtomicInt(&lib_ready, 0);
     library_free(&lib);
+    userlist_free(&favs);
+    userlist_free(&recent);
     config_free(&cfg);
     LOG("exit %d", rc);
     log_close();

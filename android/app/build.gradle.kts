@@ -2,6 +2,7 @@ import java.io.File
 
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 // android/VERSION (MAJOR.MINOR.PATCH) and android/BUILD (goes up by one for
@@ -102,6 +103,21 @@ android {
     lint {
         abortOnError = false
     }
+
+    buildFeatures {
+        compose = true
+    }
+}
+
+// The interface (A4). Agreed with Aisling 2026-11-24; all Apache 2.0,
+// built from source by AOSP. NOTES.md (A4) lists them. The BOM is the newest
+// whose libraries compile against SDK 36 (Compose 1.12 and later need 37).
+dependencies {
+    implementation(platform("androidx.compose:compose-bom:2026.06.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.activity:activity-compose:1.13.0")
 }
 
 kotlin {

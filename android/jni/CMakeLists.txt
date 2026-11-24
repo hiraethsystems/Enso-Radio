@@ -27,6 +27,7 @@ add_library(main SHARED
     src/log.c
     src/main.c
     src/player.c
+    src/ui_jni.c
 )
 set_target_properties(main PROPERTIES C_EXTENSIONS ON)
 target_compile_definitions(main PRIVATE

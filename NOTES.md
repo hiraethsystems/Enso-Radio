@@ -684,6 +684,126 @@ with the screen off. Bluetooth and wired headset buttons weren't
 available to test; taken as working for now (they use the same media
 session as the lock screen buttons). Worth trying when to hand. A3 done.
 
+## A4: the interface (builds 14 to 16, 2026-11-24)
+
+**What there is now**, in Material 3 (Jetpack Compose) over the globe:
+- **Search bar** floating at the top. It opens a search page (places and
+  stations, as you type, using `core/search.c`). A menu holds Settings
+  and About.
+- **The sheet**, dragged between three heights (peek, half, full):
+  - At its lowest: the mini player, if something is playing, and the
+    tuned place, its country and how many stations it has.
+  - Above that: four tabs, **Here** (the tuned place's stations),
+    **Browse** (countries, then their places; or genres, then their
+    stations), **Favourites** and **Recent**.
+  - A place is tuned by holding it under the ring, by tapping it in
+    Browse, or by picking it in search; the globe flies there and plays
+    it. A station plays when tapped anywhere.
+  - Lists scroll inside the sheet and drag it once they reach the top.
+- **Mini player:** station, title playing, star and play/pause. Tapping it
+  opens **Now Playing**:
+  - Station, place, title.
+  - Previous, play/pause, next (stations at the same place) and stop.
+  - Favourite.
+  - Sleep timer: off, 15, 30, 60 or 90 minutes.
+  - Stream details: codec, bitrate, rate, buffer.
+  - The station's website (the stream's own, or the `web:` link in the
+    list) and the stream address, which can be copied.
+- **Settings:**
+  - Colours: DX Garden's, or the phone's (Material You).
+  - Light, dark or as the phone.
+  - Buffer before playing: short 32 KB, normal 64, long 160 (saved to
+    `config.ini` too).
+  - The tick when tuned, on or off.
+  - Where your files are.
+- **About:**
+  - Name, version and build.
+  - A short description.
+  - Author: "Made by Aisling" and aisling@hiraeth.club (tap to email).
+    **To confirm with Aisling.** Both are constants at the end of
+    `Pages.kt`.
+  - The dedication, as given.
+  - Credits.
+- **Landscape and large screens:** the sheet becomes a panel on the left,
+  at most 420 dp or 45% of the width. The globe is drawn beside it rather
+  than under it, so the crosshair stays in the middle of the visible globe
+  and drags stay exact (native viewport offset, `app_set_globe_left`).
+- **Back** (predictive): closes a page (it shrinks with the gesture),
+  then an open country or genre, then lowers the sheet. Then Android's
+  own back to the home screen. Playback carries on.
+- **TalkBack:**
+  - Icon buttons have labels.
+  - Rows say what tapping does ("Play", "Go there and play").
+  - The playing station is announced as such.
+  - The place label under the ring is a polite live region.
+- The build number stays visible: at the top right of the sheet, and at
+  the foot of the landscape panel.
+- Favourites and recent are kept in `favourites.txt` and `recent.txt` in
+  the files folder, by stream URL, as on Linux (`core/userlist.c`).
+
+**Libraries** (agreed 2026-11-24, all Apache 2.0, built from source by
+AOSP):
+
+| Library | Version |
+|---|---|
+| Compose BOM | 2026.06.01 |
+| `compose.ui`, `compose.foundation` | 1.11.4 |
+| `compose.material3` | 1.4.0 |
+| `activity-compose` | 1.13.0 |
+
+They bring in AndroidX core, lifecycle, savedstate and Kotlin coroutines
+with them. I'd proposed BOM 2026.11.01 (Compose 1.13, Material 3 1.5),
+but Compose 1.12 and later need compile SDK 37, and the brief fixes it at
+36. So this uses the newest release that builds against 36. Moving to
+compile SDK 37 (target stays 36) would allow the newer one; Aisling's
+call. `lifecycle-runtime-compose` was proposed but not needed, so it isn't
+used (its current version also needs SDK 37).
+
+**How it fits together:**
+- SDL's activity is a plain `Activity`, so `MainActivity` provides what
+  Compose needs itself: lifecycle, saved state, a view model store and
+  the back dispatcher (tied to `OnBackInvokedDispatcher`). SDL's Java
+  files are unchanged.
+- The `ComposeView` lies over SDL's surface. Touches that no part of the
+  interface uses fall through to the globe.
+- The library is read-only once loaded, so `ui_jni.c` answers the
+  interface's questions straight from it on Android's threads: places,
+  stations, countries, genres, search, favourites. Search runs off the
+  main thread.
+- Commands (play this station, show this place, buffer) go through the
+  same queue as the media buttons.
+- Java strings from native code are now made from UTF-16
+  (`bridge_jstring`), not `NewStringUTF`, which mangles emoji and can
+  abort in debug builds on unusual UTF-8.
+- Icons are a handful of Material Icons paths (Apache 2.0) in `Icons.kt`,
+  not the icon library.
+
+**Checked headless:**
+- Emulator:
+  - Portrait and landscape, light and dark.
+  - Dragging the globe through the interface.
+  - Dragging the sheet; search ("swansea" finds Swansea, Wales), picking
+    the place flew there and played it.
+  - The menu, Settings, About (scrolled through), Now Playing with live
+    stream details.
+  - Back closes the keyboard and then the page.
+  - Landscape crosshair centred in the visible globe; dragging there.
+  - The accessibility tree has the labels.
+- Phone (build 16): starts, library in 130 ms, interface over the globe.
+
+**Known issues:**
+- Text is in English in the code, not yet in string resources, so it
+  can't be translated yet.
+- At half height the sheet covers the label under the ring (the ring
+  itself stays in view). The place row in the sheet says the same.
+- In the sheet's tabs, A4 has four tabs ("Here" first) rather than NOTES'
+  earlier plan of the place's stations at half height and tabs only at
+  full. The content would otherwise swap under your finger as the sheet
+  is dragged.
+- Download Station List (in the menu) and adding stations come in A5.
+- Not measured: how smooth the sheet and lists are on slower phones than
+  the S25 Ultra.
+
 ---
 
 (The Linux and Vita notes follow, unchanged from DX-Garden-Linux.)

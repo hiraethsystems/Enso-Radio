@@ -235,6 +235,15 @@ static void focus_place(int pl)
     globe_dwell_force(&dwell, pl);
 }
 
+void globeview_show_place(int pl, int play)
+{
+    if (pl < 0 || pl >= L->n_places)
+        return;
+    focus_place(pl);
+    if (play)
+        tune(pl);
+}
+
 /* Where the grabbed point is on screen with the camera at (lat, lon). */
 static int grab_on_screen(double lat, double lon, double *x, double *y)
 {
@@ -595,11 +604,11 @@ static void update_label(void)
         place_s[0] = 0;
         detail[0] = 0;
     }
-    snprintf(both, sizeof(both), "%s\n%s", place_s, detail);
+    snprintf(both, sizeof(both), "%d\n%s\n%s", pl, place_s, detail);
     if (strcmp(both, last_label) != 0) {
         snprintf(last_label, sizeof(last_label), "%s", both);
         if (H.label)
-            H.label(place_s, detail);
+            H.label(pl, place_s, detail);
     }
 }
 

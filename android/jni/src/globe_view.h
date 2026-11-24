@@ -17,7 +17,8 @@
 typedef struct {
     void (*play)(int station);  /* start a station (index into lib->stations) */
     int (*playing)(void);       /* the station playing, or -1 */
-    void (*label)(const char *place, const char *detail); /* the place label */
+    /* The place label: the place index (or -1), its name and a detail line. */
+    void (*label)(int place, const char *name, const char *detail);
     void (*tick)(void);         /* a light haptic tick: tuned to a new place */
 } globeview_hooks;
 
@@ -32,6 +33,8 @@ void globeview_event(const SDL_Event *e, int w, int h);
 /* Once a frame: motion, tuning and drawing. density: pixels per dp.
  * unix_s: the time for the Sun, or 0 for now. */
 void globeview_frame(int w, int h, float density, double unix_s);
+/* Turns the globe to a place (from the interface); play: also plays it. */
+void globeview_show_place(int place, int play);
 /* The GL context was lost and remade. */
 void globeview_gl_reset(void);
 

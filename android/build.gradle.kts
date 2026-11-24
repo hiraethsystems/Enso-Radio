@@ -4,4 +4,6 @@ plugins {
     // AGP 9 compiles Kotlin itself ("built-in Kotlin"); listing the Kotlin
     // plugin here pins the Kotlin compiler version it uses.
     id("org.jetbrains.kotlin.android") version "2.4.21" apply false
+    // The Compose compiler ships with Kotlin and has the same version.
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.21" apply false
 }
