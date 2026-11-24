@@ -28,6 +28,7 @@
 #define WORKERS 2
 #define UPLOADS_PER_FRAME 8
 #define MAX_DRAW 1024
+#define DRAW_BUDGET 120 /* tiles per layer; both layers fit the cache */
 #define FOV_DEG 40.0 /* across the shorter side of the screen */
 #define PI 3.14159265358979323846
 #define DEG (PI / 180.0)
@@ -242,7 +243,8 @@ typedef struct {
     uint32_t key;
     int state;
     GLuint tex;
-    uint64_t used; /* frame last drawn */
+    uint64_t used;  /* frame last drawn */
+    uint64_t asked; /* SDL ticks (ms) when it was asked for, while loading */
 } slot;
 
 typedef struct {
@@ -258,7 +260,11 @@ static SDL_Mutex *qlock;
 static SDL_Condition *qcond;
 static uint32_t queue[QUEUE_MAX];
 static int n_queue;
-static decoded done[QUEUE_MAX];
+/* Decoded tiles waiting for upload. The loaders wait while it is full
+ * (room for one more from each), so a decoded tile is never thrown away:
+ * one lost here would stay "loading" for good and never be asked for
+ * again. */
+static decoded done[QUEUE_MAX + WORKERS];
 static int n_done;
 static SDL_Thread *workers[WORKERS];
 static int quitting;
@@ -277,7 +283,7 @@ static int SDLCALL worker(void *ud)
         SDL_IOStream *io;
 
         SDL_LockMutex(qlock);
-        while (!quitting && n_queue == 0)
+        while (!quitting && (n_queue == 0 || n_done >= QUEUE_MAX))
             SDL_WaitCondition(qcond, qlock);
         if (quitting) {
             SDL_UnlockMutex(qlock);
@@ -298,15 +304,11 @@ static int SDLCALL worker(void *ud)
         free(buf);
 
         SDL_LockMutex(qlock);
-        if (n_done < QUEUE_MAX) {
-            done[n_done].key = key;
-            done[n_done].w = w;
-            done[n_done].h = h;
-            done[n_done].px = px; /* NULL on failure: the slot is freed */
-            n_done++;
-        } else {
-            stbi_image_free(px);
-        }
+        done[n_done].key = key;
+        done[n_done].w = w;
+        done[n_done].h = h;
+        done[n_done].px = px; /* NULL on failure: the slot is freed */
+        n_done++;
         SDL_UnlockMutex(qlock);
     }
     for (l = 0; l < LAYERS; l++)
@@ -332,7 +334,12 @@ static slot *want(int layer, int level, int x, int y)
     int i;
     if (s) {
         s->used = frame_no;
-        return s->state == SLOT_READY ? s : NULL;
+        if (s->state == SLOT_LOADING && SDL_GetTicks() - s->asked > 5000) {
+            /* Lost somewhere (it shouldn't happen): ask again below. */
+            s->state = SLOT_EMPTY;
+        } else {
+            return s->state == SLOT_READY ? s : NULL;
+        }
     }
     if (find_entry(key) < 0)
         return NULL;
@@ -366,6 +373,7 @@ static slot *want(int layer, int level, int x, int y)
     victim->key = key;
     victim->state = SLOT_LOADING;
     victim->used = frame_no;
+    victim->asked = SDL_GetTicks();
     return NULL;
 }
 
@@ -382,6 +390,8 @@ void earth_update(void)
     memcpy(batch, done, sizeof(decoded) * (size_t)n);
     memmove(done, done + n, sizeof(decoded) * (size_t)(n_done - n));
     n_done -= n;
+    if (n)
+        SDL_BroadcastCondition(qcond); /* room again for waiting loaders */
     SDL_UnlockMutex(qlock);
 
     for (i = 0; i < n; i++) {
@@ -847,6 +857,11 @@ typedef struct {
 
 static tile_ref draw_list[MAX_DRAW];
 static int n_draw;
+/* A tile splits once its texels would be more than lod_k px on screen.
+ * 1.2 normally; raised when that would need more tiles than DRAW_BUDGET,
+ * as near the poles, where a whole ring of thin tiles is in view and the
+ * cache would otherwise thrash (tiles popping in and out). */
+static double lod_k = 1.2;
 static double vis_angle; /* radians from the nadir that can be on screen */
 static earth_camera cur_cam;
 static frame cur_frame;
@@ -897,7 +912,7 @@ static void select_tiles(int level, int x, int y)
         dist = sqrt(cur_cam.alt * cur_cam.alt + surf * surf);
         edge = fmax(dlat, dlon * cos(near_lat * DEG)) * DEG * EARTH_R;
         px = edge / dist * cur_frame.focal;
-        if (px > TILE_PX * 1.2) {
+        if (px > TILE_PX * lod_k) {
             select_tiles(level + 1, 2 * x, 2 * y);
             select_tiles(level + 1, 2 * x + 1, 2 * y);
             select_tiles(level + 1, 2 * x, 2 * y + 1);
@@ -1088,9 +1103,13 @@ void earth_render(const earth_camera *cam, int w, int h, float dot_scale, int ca
         if (vis_angle > horizon)
             vis_angle = horizon;
     }
-    n_draw = 0;
-    select_tiles(0, 0, 0);
-    select_tiles(0, 1, 0);
+    for (lod_k = 1.2;; lod_k *= 1.4) {
+        n_draw = 0;
+        select_tiles(0, 0, 0);
+        select_tiles(0, 1, 0);
+        if (n_draw <= DRAW_BUDGET || lod_k > 20)
+            break;
+    }
 
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -1185,4 +1204,23 @@ double earth_deg_per_px(const earth_camera *cam, int short_side)
     double focal = short_side / (2.0 * tan(FOV_DEG * DEG / 2));
     /* At the centre the ground is `alt` away and seen square on. */
     return cam->alt / focal / EARTH_R / DEG;
+}
+
+int earth_drawn(void)
+{
+    int i, lv[8] = { 0 }, ly[2] = { 0 }, nq, nd;
+    if (qlock) {
+        SDL_LockMutex(qlock);
+        nq = n_queue;
+        nd = n_done;
+        SDL_UnlockMutex(qlock);
+        for (i = 0; i < CACHE_SLOTS; i++)
+            if (slots[i].state == SLOT_LOADING) {
+                lv[key_level(slots[i].key) & 7]++;
+                ly[key_layer(slots[i].key) & 1]++;
+            }
+        LOG("tiles: queue %d, decoded %d, loading by level %d %d %d %d %d %d %d, day %d night %d",
+            nq, nd, lv[0], lv[1], lv[2], lv[3], lv[4], lv[5], lv[6], ly[0], ly[1]);
+    }
+    return n_draw;
 }

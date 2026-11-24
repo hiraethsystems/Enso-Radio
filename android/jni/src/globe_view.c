@@ -21,6 +21,19 @@
 #define DOT_TAP_DP 18.0 /* a tap this near a dot plays it */
 #define ZOOM_STEP 0.4   /* double-tap: altitude x 0.4; two-finger tap: / 0.4 */
 #define MAX_FINGERS 2
+#define PINCH_MIN_DP 60.0  /* finger gaps below this count as this, so fingers
+                            * nearly together can't swing the zoom */
+#define LAT_LIMIT 87.0      /* north stays up, so the camera stops short of the poles */
+#define FLING_WINDOW_NS 80000000ull /* velocity from the last 80 ms of the drag */
+#define FLING_DECAY 2.5     /* per second */
+#define ZOOM_RATE 7.0       /* zoom easing, per second */
+#define FLY_RATE 4.5        /* flying to a place, per second */
+#define SAMPLES 16
+
+/* Unit vectors: y is north; longitude 0 is +z and 90 E is +x (as earth.c). */
+typedef struct {
+    double x, y, z;
+} v3;
 
 static const library *L;
 static globeview_hooks H;
@@ -28,7 +41,8 @@ static earth_camera cam;
 static double alt_target;
 static int flying;
 static double fly_lat, fly_lon;
-static double vlat, vlon; /* coasting, degrees per second */
+static v3 spin_axis;      /* coasting: the camera turns about this unit axis */
+static double spin_rate;  /* ... at this many radians per second */
 static globe_dwell dwell;
 static int candidate = -1, started;
 static int px_w, px_h;
@@ -53,8 +67,12 @@ static double grab_lat, grab_lon;
 static double pinch_d0, pinch_alt0;
 static Uint64 last_tap_ms;
 static double last_tap_x, last_tap_y;
-static double prev_lat, prev_lon;
-static Uint64 prev_move_ns;
+/* The camera's recent positions, for the fling. */
+static struct {
+    v3 c;
+    Uint64 ns;
+} samples[SAMPLES];
+static int n_samples;
 
 static double wrap_lon(double lon)
 {
@@ -70,13 +88,69 @@ static double clampd(double v, double lo, double hi)
     return v < lo ? lo : v > hi ? hi : v;
 }
 
+static v3 ll_vec(double lat, double lon)
+{
+    double la = lat * 0.017453292519943295, lo = lon * 0.017453292519943295;
+    v3 r = { cos(la) * sin(lo), sin(la), cos(la) * cos(lo) };
+    return r;
+}
+
+static double v_dot(v3 a, v3 b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+static v3 v_cross(v3 a, v3 b)
+{
+    v3 r = { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
+    return r;
+}
+
+static v3 v_scale(v3 a, double k)
+{
+    v3 r = { a.x * k, a.y * k, a.z * k };
+    return r;
+}
+
+static double v_len(v3 a)
+{
+    return sqrt(v_dot(a, a));
+}
+
+/* Rotates v about the unit axis by angle (radians), Rodrigues' formula. */
+static v3 v_rotate(v3 v, v3 axis, double angle)
+{
+    double c = cos(angle), s = sin(angle);
+    v3 k = v_cross(axis, v);
+    double d = v_dot(axis, v) * (1 - c);
+    v3 r = { v.x * c + k.x * s + axis.x * d, v.y * c + k.y * s + axis.y * d,
+             v.z * c + k.z * s + axis.z * d };
+    return r;
+}
+
+/* Turns the camera's position by a rotation (unit axis, angle), keeping
+ * north up and the latitude inside the limit. */
+static int cam_rotate(v3 axis, double angle)
+{
+    v3 c = v_rotate(ll_vec(cam.lat, cam.lon), axis, angle);
+    double la = asin(clampd(c.y, -1.0, 1.0)) * 57.29577951308232;
+    double lo = wrap_lon(atan2(c.x, c.z) * 57.29577951308232);
+    /* Past the latitude limit, or over a pole (which flips the longitude
+     * and, with north up, turns the view round): refuse. */
+    if (fabs(la) > LAT_LIMIT || fabs(wrap_lon(lo - cam.lon)) > 90.0)
+        return 0;
+    cam.lat = la;
+    cam.lon = lo;
+    return 1;
+}
+
 void globeview_init(const library *lib, const config *cfg, const globeview_hooks *hooks,
                     const char *day_pack, const char *night_pack)
 {
     L = lib;
     H = *hooks;
     /* Starts over Wales, as on Linux, unless a camera was saved. */
-    cam.lat = config_get_int(cfg, "globe", "lat_x100", 5200, -8500, 8500) / 100.0;
+    cam.lat = config_get_int(cfg, "globe", "lat_x100", 5200, -8700, 8700) / 100.0;
     cam.lon = config_get_int(cfg, "globe", "lon_x100", -300, -18000, 18000) / 100.0;
     cam.alt = config_get_int(cfg, "globe", "alt_km", 7000, (int)GLOBE_ALT_MIN,
                              (int)GLOBE_ALT_MAX);
@@ -107,8 +181,8 @@ void globeview_gl_reset(void)
 void globeview_goto(double lat, double lon, double alt)
 {
     flying = 0;
-    vlat = vlon = 0;
-    cam.lat = clampd(lat, -85.0, 85.0);
+    spin_rate = 0;
+    cam.lat = clampd(lat, -LAT_LIMIT, LAT_LIMIT);
     cam.lon = wrap_lon(lon);
     if (alt > 0)
         cam.alt = alt_target = clampd(alt, GLOBE_ALT_MIN, GLOBE_ALT_MAX);
@@ -119,6 +193,11 @@ void globeview_camera(double *lat, double *lon, double *alt)
     *lat = cam.lat;
     *lon = cam.lon;
     *alt = cam.alt;
+}
+
+int globeview_probe(int w, int h, double x, double y, double *lat, double *lon)
+{
+    return earth_unproject(&cam, w, h, x, y, lat, lon);
 }
 
 int globeview_candidate(void)
@@ -150,22 +229,107 @@ static void focus_place(int pl)
     flying = 1;
     fly_lat = L->places[pl].lat;
     fly_lon = L->places[pl].lon;
-    vlat = vlon = 0;
+    spin_rate = 0;
     if (alt_target > 3000)
         alt_target = 3000;
     globe_dwell_force(&dwell, pl);
 }
 
-/* Moves the camera so the grabbed point is under the pixel again. */
+/* Where the grabbed point is on screen with the camera at (lat, lon). */
+static int grab_on_screen(double lat, double lon, double *x, double *y)
+{
+    earth_camera c = cam;
+    c.lat = lat;
+    c.lon = lon;
+    return earth_project(&c, px_w, px_h, grab_lat, grab_lon, x, y);
+}
+
+/* Screen distance squared from the grabbed point to (sx, sy), with the
+ * camera at (lat, lon); huge if the point is out of sight. */
+static double grab_error(double lat, double lon, double sx, double sy)
+{
+    double x, y;
+    if (!grab_on_screen(lat, lon, &x, &y))
+        return 1e30;
+    return (sx - x) * (sx - x) + (sy - y) * (sy - y);
+}
+
+/* Moves the camera so the grabbed point is under the pixel again.
+ *
+ * First, rotations: each turns the camera by the rotation that carries the
+ * point now under the pixel onto the grabbed one. That is exact on a
+ * sphere, and right at any latitude, where adding to latitude and longitude
+ * goes wrong; it gets close in a step or two.
+ *
+ * Then Newton steps on the screen position itself, which take up the
+ * twist that keeping north up adds at high latitudes. Every step is kept
+ * only if it brings the point closer to the finger, so nothing jumps. Near
+ * a pole, a drag that would need the camera over the pole (impossible with
+ * north up) stops at the latitude limit, and sideways drags still turn the
+ * globe about the pole. */
 static void follow_grab(double sx, double sy)
 {
+    v3 g = ll_vec(grab_lat, grab_lon);
+    double err = grab_error(cam.lat, cam.lon, sx, sy);
     int i;
-    for (i = 0; i < 4; i++) {
-        double la, lo;
+    for (i = 0; i < 2 && err > 0.01; i++) {
+        double la, lo, d, sn, e2;
+        earth_camera keep = cam;
+        v3 p, axis;
         if (!earth_unproject(&cam, px_w, px_h, sx, sy, &la, &lo))
+            break;
+        p = ll_vec(la, lo);
+        axis = v_cross(p, g);
+        sn = v_len(axis);
+        d = v_dot(p, g);
+        if (sn < 1e-12)
+            break;
+        /* The camera turns with the rotation, so the ray through the
+         * pixel lands on the grabbed point. */
+        if (!cam_rotate(v_scale(axis, 1.0 / sn), atan2(sn, d)))
+            break;
+        e2 = grab_error(cam.lat, cam.lon, sx, sy);
+        if (e2 >= err) {
+            cam = keep;
+            break;
+        }
+        err = e2;
+    }
+    for (i = 0; i < 8 && err > 0.01; i++) {
+        double x, y, xa, ya, xo, yo, h = 1e-4, j00, j01, j10, j11, det, dla, dlo, ex, ey;
+        double t, hs = cam.lat > 0 ? -h : h;
+        int ok = 0;
+        if (!grab_on_screen(cam.lat, cam.lon, &x, &y) ||
+            !grab_on_screen(cam.lat + hs, cam.lon, &xa, &ya) ||
+            !grab_on_screen(cam.lat, cam.lon + h, &xo, &yo))
             return;
-        cam.lat = clampd(cam.lat + (grab_lat - la), -85.0, 85.0);
-        cam.lon = wrap_lon(cam.lon + wrap_lon(grab_lon - lo));
+        ex = sx - x;
+        ey = sy - y;
+        j00 = (xa - x) / hs;
+        j10 = (ya - y) / hs;
+        j01 = (xo - x) / h;
+        j11 = (yo - y) / h;
+        det = j00 * j11 - j01 * j10;
+        if (fabs(det) < 1e-9)
+            return;
+        dla = clampd((j11 * ex - j01 * ey) / det, -5.0, 5.0);
+        dlo = clampd((-j10 * ex + j00 * ey) / det, -5.0, 5.0);
+        /* Take the step, or half of it, or a quarter...: whichever first
+         * brings the point closer. */
+        for (t = 1.0; t > 0.05; t *= 0.5) {
+            double la = clampd(cam.lat + dla * t, -LAT_LIMIT, LAT_LIMIT);
+            double lo = wrap_lon(cam.lon + dlo * t);
+            double e2 = grab_error(la, lo, sx, sy);
+            if (e2 < err) {
+                cam.lat = la;
+                cam.lon = lo;
+                err = e2;
+                ok = 1;
+                break;
+            }
+        }
+        if (!ok)
+            return;
     }
 }
 
@@ -190,7 +354,45 @@ static void focus_point(double *x, double *y)
 static double finger_dist(void)
 {
     double dx = fingers[0].x - fingers[1].x, dy = fingers[0].y - fingers[1].y;
-    return sqrt(dx * dx + dy * dy);
+    return fmax(sqrt(dx * dx + dy * dy), PINCH_MIN_DP * dens);
+}
+
+static void sample_camera(void)
+{
+    if (n_samples == SAMPLES) {
+        memmove(samples, samples + 1, sizeof(samples[0]) * (SAMPLES - 1));
+        n_samples--;
+    }
+    samples[n_samples].c = ll_vec(cam.lat, cam.lon);
+    samples[n_samples].ns = SDL_GetTicksNS();
+    n_samples++;
+}
+
+/* On release: the camera's turn over the last moments of the drag, as an
+ * axis and rate, unless the finger was held still before lifting. */
+static void start_fling(void)
+{
+    Uint64 now = SDL_GetTicksNS();
+    int i, k = -1;
+    v3 a, b, axis;
+    double dt, sn;
+    spin_rate = 0;
+    if (n_samples < 2 || now - samples[n_samples - 1].ns > FLING_WINDOW_NS)
+        return;
+    for (i = n_samples - 2; i >= 0; i--) {
+        k = i;
+        if (samples[n_samples - 1].ns - samples[i].ns >= FLING_WINDOW_NS)
+            break;
+    }
+    a = samples[k].c;
+    b = samples[n_samples - 1].c;
+    dt = (samples[n_samples - 1].ns - samples[k].ns) / 1e9;
+    axis = v_cross(a, b);
+    sn = v_len(axis);
+    if (dt < 0.008 || sn < 1e-9)
+        return;
+    spin_axis = v_scale(axis, 1.0 / sn);
+    spin_rate = atan2(sn, v_dot(a, b)) / dt;
 }
 
 /* Starts following the current fingers afresh (after one is added or
@@ -272,10 +474,8 @@ void globeview_event(const SDL_Event *e, int w, int h)
             gesture_t0 = now_ms;
             gesture_moved = 0;
             flying = 0;
-            vlat = vlon = 0;
-            prev_lat = cam.lat;
-            prev_lon = cam.lon;
-            prev_move_ns = SDL_GetTicksNS();
+            spin_rate = 0;
+            n_samples = 0;
         }
         fingers[n_fingers].id = e->tfinger.fingerID;
         fingers[n_fingers].x = fingers[n_fingers].x0 = x;
@@ -297,11 +497,8 @@ void globeview_event(const SDL_Event *e, int w, int h)
         if (!gesture_moved)
             return;
         if (n_fingers >= 2 && pinch_d0 > 1) {
-            double d = finger_dist();
-            if (d > 1) {
-                cam.alt = alt_target =
-                    clampd(pinch_alt0 * pinch_d0 / d, GLOBE_ALT_MIN, GLOBE_ALT_MAX);
-            }
+            cam.alt = alt_target =
+                clampd(pinch_alt0 * pinch_d0 / finger_dist(), GLOBE_ALT_MIN, GLOBE_ALT_MAX);
         }
         focus_point(&x, &y);
         if (grab_hit) {
@@ -310,19 +507,7 @@ void globeview_event(const SDL_Event *e, int w, int h)
             /* Grabbed the sky: grab again where the finger is now. */
             grab(x, y);
         }
-        {
-            /* Smoothed velocity for the fling. */
-            Uint64 ns = SDL_GetTicksNS();
-            double dt = (ns - prev_move_ns) / 1e9;
-            if (dt > 0.001) {
-                double nl = (cam.lat - prev_lat) / dt, no = wrap_lon(cam.lon - prev_lon) / dt;
-                vlat = vlat * 0.5 + nl * 0.5;
-                vlon = vlon * 0.5 + no * 0.5;
-                prev_lat = cam.lat;
-                prev_lon = cam.lon;
-                prev_move_ns = ns;
-            }
-        }
+        sample_camera();
         break;
 
     case SDL_EVENT_FINGER_UP:
@@ -333,16 +518,16 @@ void globeview_event(const SDL_Event *e, int w, int h)
         n_fingers--;
         if (n_fingers > 0) {
             /* Pinch to drag: carry on with the other finger. */
-            vlat = vlon = 0;
+            spin_rate = 0;
             regrab();
             return;
         }
         if (e->type == SDL_EVENT_FINGER_CANCELED) {
-            vlat = vlon = 0;
+            spin_rate = 0;
             return;
         }
         if (!gesture_moved && now_ms - gesture_t0 <= TAP_MS + (gesture_max > 1 ? 100 : 0)) {
-            vlat = vlon = 0;
+            spin_rate = 0;
             if (gesture_max >= 2) {
                 /* Two-finger tap: zoom out. */
                 alt_target = fmin(alt_target / ZOOM_STEP, GLOBE_ALT_MAX);
@@ -353,9 +538,12 @@ void globeview_event(const SDL_Event *e, int w, int h)
             }
             return;
         }
-        /* A finger held still before lifting doesn't fling. */
-        if (gesture_max > 1 || (SDL_GetTicksNS() - prev_move_ns) > 80000000ull)
-            vlat = vlon = 0;
+        /* No fling after two fingers; one held still before lifting
+         * doesn't fling either. */
+        if (gesture_max > 1)
+            spin_rate = 0;
+        else
+            start_fling();
         break;
     }
 }
@@ -363,27 +551,28 @@ void globeview_event(const SDL_Event *e, int w, int h)
 static void motion(double dt)
 {
     /* Zoom eases in log space, so each step feels the same at any height. */
-    double k = 1.0 - exp(-dt * 10.0);
+    double k = 1.0 - exp(-dt * ZOOM_RATE);
     if (n_fingers < 2) {
         cam.alt = exp(log(cam.alt) + (log(alt_target) - log(cam.alt)) * k);
         if (fabs(cam.alt - alt_target) < 0.01)
             cam.alt = alt_target;
     }
     if (flying) {
-        double r = 1.0 - exp(-dt * 6.0), dl = wrap_lon(fly_lon - cam.lon);
+        double r = 1.0 - exp(-dt * FLY_RATE), dl = wrap_lon(fly_lon - cam.lon);
         cam.lat += (fly_lat - cam.lat) * r;
         cam.lon = wrap_lon(cam.lon + dl * r);
         if (fabs(fly_lat - cam.lat) < 1e-4 && fabs(dl) < 1e-4)
             flying = 0;
-    } else if (n_fingers == 0 && (vlat != 0 || vlon != 0)) {
+    } else if (n_fingers == 0 && spin_rate > 0) {
+        /* Coasting after a fling: keep turning, slowing down, until the
+         * surface moves less than about 3 px a second. */
         int side = px_w < px_h ? px_w : px_h;
-        double stop = earth_deg_per_px(&cam, side > 0 ? side : 600) * 3.0;
-        cam.lat = clampd(cam.lat + vlat * dt, -85.0, 85.0);
-        cam.lon = wrap_lon(cam.lon + vlon * dt);
-        vlat *= exp(-dt * 3.0);
-        vlon *= exp(-dt * 3.0);
-        if (fabs(vlat) < stop && fabs(vlon) < stop)
-            vlat = vlon = 0;
+        double stop = earth_deg_per_px(&cam, side > 0 ? side : 600) * 3.0 * 0.017453292519943295;
+        if (!cam_rotate(spin_axis, spin_rate * dt))
+            spin_rate = 0; /* reached the latitude limit */
+        spin_rate *= exp(-dt * FLING_DECAY);
+        if (spin_rate < stop)
+            spin_rate = 0;
     }
 }
 

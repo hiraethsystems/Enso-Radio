@@ -534,6 +534,59 @@ the Sun), `-e screenshot FILE -e frames N`, and `-e script` with `wait N`,
 
 **Checkpoint [me]:** how the globe looks and feels under a finger.
 
+### A2 phone feedback and fixes (builds 7 to 9, 2026-11-24)
+
+Aisling on build 6: audio fine, label readable; but (1) the first couple of
+zoom-outs zoomed out, moved the map, then zoomed in sharply somewhere else;
+(2) tiles popped in and out around the North Pole; (3) touch a bit too
+snappy, and inaccurate near the poles.
+
+To reproduce gestures headless, the test script gained synthetic fingers
+(`fdown|fmove|fup ID X Y`), `trace N` (the camera each frame), `probe X Y`
+(the point under a pixel) and `stats` (the tile cache).
+
+1. **The zoom jump.** At the end of a pinch the fingers are almost
+   touching. The screen can report one lifting and a new one landing right
+   next to the other, and a new pinch then started from a gap of about
+   90 px, so a few pixels of spread zoomed right in and the midpoint
+   dragged the map. Replayed on the emulator: 16,486 km went to 6,466 km
+   and moved 5 degrees. Fix: pinch distances have a floor of 60 dp. The
+   same replay now stays at 14,877 km.
+2. **Pop-in at the poles.** Two causes:
+   - **Lost tiles.** Decoded tiles waiting for upload (8 a frame) were
+     thrown away once 96 were waiting. Their slots stayed "loading" for
+     good and were never asked for again, so the coarser parent showed
+     instead. This came from the Linux code (`linux/earth.c` has the same
+     bug). Now the loaders wait for room, and anything still loading after
+     5 s is asked for again. 21 to 64 stuck tiles went to 0.
+   - **Too many tiles.** Near a pole a whole ring of thin tiles is in
+     view, more than the cache holds. The detail threshold now rises until
+     the view needs at most 120 tiles per layer. At the pole it now draws
+     80 to 90.
+3. **Dragging near the poles.** Adding to latitude and longitude goes wrong
+   at high latitudes. The drag now turns the camera by the 3D rotation that
+   carries the point under the finger onto the grabbed one. Then Newton
+   steps on the screen position take up the twist from keeping north up.
+   Every step is kept only if it brings the point closer, so nothing can
+   jump. Measured: a circular drag at 60 N and at the equator keeps the
+   grabbed point under the finger to within 0.01 degrees.
+   
+   North stays up, as on Linux. A north-up camera can't pass over a pole
+   without the view spinning round, so the camera now stops at 87 degrees
+   (it was 85), and sideways drags still turn the globe about the pole. A
+   fling uses the same rotation and stops at the limit instead of flipping.
+4. **Less snappy.** Zoom easing 10 to 7 per second; flying to a place 6 to
+   4.5; the fling's speed now comes from the last 80 ms of the drag (it
+   was a running average of each event) and slows a little sooner (decay 3
+   to 2.5 per second, from a calmer start). Aisling to judge whether
+   that's the right direction.
+
+**Known issues:**
+- A faint seam along the 180-degree meridian close to the North Pole,
+  where tiles are thin and meet at the edge of NASA's source pieces.
+- The phone was locked during the last test run, so build 9's tile counts
+  were checked only on the emulator.
+
 ---
 
 (The Linux and Vita notes follow, unchanged from DX-Garden-Linux.)

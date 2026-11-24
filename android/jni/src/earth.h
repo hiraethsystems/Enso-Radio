@@ -62,5 +62,7 @@ double earth_deg_per_px(const earth_camera *cam, int short_side);
 /* Imagery statistics for the log and About: tiles cached, loading, and
  * the deepest level in the pack. */
 void earth_stats(int *cached, int *loading, int *max_level);
+/* Tiles drawn last frame (per layer). */
+int earth_drawn(void);
 
 #endif

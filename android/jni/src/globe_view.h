@@ -38,6 +38,8 @@ void globeview_gl_reset(void);
 /* For scripted tests: the camera, set at once (alt <= 0 keeps it). */
 void globeview_goto(double lat, double lon, double alt);
 void globeview_camera(double *lat, double *lon, double *alt);
+/* The point on the Earth under a pixel; 1 if there is one. */
+int globeview_probe(int w, int h, double x, double y, double *lat, double *lon);
 /* The place under the crosshair, or -1; and whether gestures are moving it. */
 int globeview_candidate(void);
 

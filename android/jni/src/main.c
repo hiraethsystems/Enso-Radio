@@ -17,7 +17,10 @@
  *   --script "STEPS"  ';'-separated, one step a frame:
  *                     wait N (frames), sleep MS, goto LAT LON ALT,
  *                     camera (logs it), shot FILE, glreset (rebuilds the
- *                     globe's GL objects as after a lost context), quit
+ *                     globe's GL objects as after a lost context),
+ *                     fdown|fmove|fup ID X Y (a finger, window pixels),
+ *                     trace N (log the camera for N frames), probe X Y (the
+ *                     point under a pixel), stats (tile cache), quit
  *   --verbose         (accepted; the log always goes to logcat)
  */
 #include <stdio.h>
@@ -265,6 +268,24 @@ static void save_screenshot(SDL_Window *win, const char *name)
     SDL_free(path);
 }
 
+static int trace_frames;
+
+static void push_finger(SDL_Window *win, Uint32 type, int id, double x, double y)
+{
+    SDL_Event e;
+    int w, h;
+    SDL_GetWindowSizeInPixels(win, &w, &h);
+    SDL_zero(e);
+    e.type = type;
+    e.tfinger.touchID = 1;
+    e.tfinger.fingerID = (SDL_FingerID)id;
+    e.tfinger.x = (float)(x / w);
+    e.tfinger.y = (float)(y / h);
+    e.tfinger.pressure = 1.0f;
+    e.tfinger.windowID = SDL_GetWindowID(win);
+    SDL_PushEvent(&e);
+}
+
 /* Runs script steps up to the next wait. Returns 0 on "quit". */
 static int script_step(SDL_Window *win, char **cursor, int *wait)
 {
@@ -298,6 +319,26 @@ static int script_step(SDL_Window *win, char **cursor, int *wait)
                 globeview_candidate());
         } else if (sscanf(step, " shot %199s", arg) == 1) {
             save_screenshot(win, arg);
+        } else if (sscanf(step, " fdown %lf %lf %lf", &a, &b, &c) == 3) {
+            push_finger(win, SDL_EVENT_FINGER_DOWN, (int)a, b, c);
+        } else if (sscanf(step, " fmove %lf %lf %lf", &a, &b, &c) == 3) {
+            push_finger(win, SDL_EVENT_FINGER_MOTION, (int)a, b, c);
+        } else if (sscanf(step, " fup %lf %lf %lf", &a, &b, &c) == 3) {
+            push_finger(win, SDL_EVENT_FINGER_UP, (int)a, b, c);
+        } else if (sscanf(step, " probe %lf %lf", &a, &b) == 2) {
+            int w, h;
+            double la, lo;
+            SDL_GetWindowSizeInPixels(win, &w, &h);
+            if (globeview_probe(w, h, a, b, &la, &lo))
+                LOG("script: probe %.0f %.0f -> %.4f %.4f", a, b, la, lo);
+            else
+                LOG("script: probe %.0f %.0f -> sky", a, b);
+        } else if (strstr(step, "stats")) {
+            int cached, loading, maxl;
+            earth_stats(&cached, &loading, &maxl);
+            LOG("script: tiles %d cached, %d loading, %d drawn", cached, loading, earth_drawn());
+        } else if (sscanf(step, " trace %lf", &a) == 1) {
+            trace_frames = (int)a;
         } else if (strstr(step, "glreset")) {
             globeview_gl_reset();
         } else if (strstr(step, "quit")) {
@@ -449,6 +490,12 @@ int main(int argc, char *argv[])
         glViewport(0, 0, w, h);
         globeview_frame(w, h, SDL_GetWindowDisplayScale(win), fixed_time);
         frame++;
+        if (trace_frames > 0) {
+            double la, lo, al;
+            trace_frames--;
+            globeview_camera(&la, &lo, &al);
+            LOG("trace %d: %.4f %.4f %.1f km", frame, la, lo, al);
+        }
         if (script && !script_step(win, &script, &script_wait))
             running = 0;
         if (shot && frame >= frames) {
