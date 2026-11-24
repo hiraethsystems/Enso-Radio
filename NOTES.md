@@ -678,6 +678,12 @@ supported yet: it needs a MediaBrowserService, a later question).
 - While paused, the globe still marks the paused station's place as
   playing.
 
+**On the phone (build 13, 2026-11-24):** Aisling checked it on the Galaxy
+S25 Ultra and all works: lock screen, notification, a call, a long listen
+with the screen off. Bluetooth and wired headset buttons weren't
+available to test; taken as working for now (they use the same media
+session as the lock screen buttons). Worth trying when to hand. A3 done.
+
 ---
 
 (The Linux and Vita notes follow, unchanged from DX-Garden-Linux.)
