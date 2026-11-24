@@ -513,7 +513,12 @@ static void test_sources(void)
     load_report r;
     static const char latin1[] = "Caf\xE9 FM | http://cafe.example/ | France | Paris | 48.85 | 2.35\n";
 
-    strcpy(tmpdir, "/tmp/dxg_test_XXXXXX");
+    /* TMPDIR first: Android has no /tmp (the emulator run uses
+       /data/local/tmp). */
+    const char *base = getenv("TMPDIR");
+    if (!base || !*base)
+        base = "/tmp";
+    snprintf(tmpdir, sizeof(tmpdir), "%s/dxg_test_XXXXXX", base);
     if (!mkdtemp(tmpdir)) {
         CHECK(!"mkdtemp failed");
         return;

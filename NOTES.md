@@ -191,7 +191,7 @@ carries straight on once its headless checks pass.
 - **A7. F-Droid.** Reproducible build checks, F-Droid metadata, the imagery
   size question above, submission.
 
-## A0: repository and toolchain (in progress)
+## A0: repository and toolchain (done, 2026-11-24)
 
 **Repository split (2026-11-24).** Made like DX-Garden-Linux was made from
 DX-Garden: a fresh clone of DX-Garden-Linux, then `git filter-repo
@@ -232,9 +232,96 @@ AVD `dxg_api36` (Pixel 8 profile): boots with `-no-window -gpu
 swiftshader_indirect` in about 20 s; reports Android 16, SDK 36,
 `PAGE_SIZE` 16384, GLES "OpenGL ES 3.0 SwiftShader".
 
-Still to do in A0: `tools/android_env.sh`, `tools/emulator.sh`,
-`tools/build_android_deps.sh`, the Gradle project, the core tests on the
-emulator, the debug APK.
+**Scripts** (all from the repository root):
+
+- `. tools/android_env.sh`: SDK, pinned NDK and CMake on the `PATH`,
+  `JAVA_HOME`, `SOURCE_DATE_EPOCH`, the AVD name and port.
+- `tools/emulator.sh start|stop|status|create`: headless emulator
+  `emulator-5580` (`-no-window -gpu swiftshader_indirect -no-audio`),
+  waits for boot (about 10 s warm) and wakes the screen.
+- `tools/build_android_deps.sh [arm64-v8a|x86_64|all] [lib...]`: the native
+  libraries, about 2 minutes per ABI on Saoirse, 80 MB per ABI in
+  `third_party/android/<abi>/` (git-ignored).
+- `tools/android_test.sh [serial]`: cross-builds `dxgarden_test` for the
+  device's ABI, pushes it and `testdata/` to `/data/local/tmp/dxg/`, runs it.
+
+**Native libraries**: the same versions and SHA-256 sums as the Linux
+script: SDL 3.4.18, curl 8.23.0, Mbed TLS 3.6.7, mpg123 1.33.7, FreeType
+2.15.0, HarfBuzz 15.0.0, FriBidi 1.0.18, faad2 2.11.4, libogg 1.3.6,
+libvorbis 1.3.7, Opus 1.6.1, opusfile 0.12, FLAC 1.5.0, zlib 1.3.1. All
+static, min SDK 33, `c++_static`.
+
+- CMake projects use the NDK's toolchain file; HarfBuzz and FriBidi use
+  meson with a cross file written per ABI; opusfile (no CMake build in
+  0.12) uses its shipped `configure --host`, so no autotools are needed.
+- Every library found our own builds, not the NDK sysroot's (checked in
+  the configure logs: curl with Mbed TLS 3.6.7, Vorbis and FLAC with our
+  Ogg, HarfBuzz with our FreeType, opusfile with our Ogg and Opus).
+- SDL is linked statically into `libmain.so`, so `MainActivity` loads only
+  `main` (`getLibraries()`).
+- Reproducible: `-ffile-prefix-map` for C, C++ **and assembly** (mpg123's
+  `.S` decoders leaked build paths until `CMAKE_ASM_FLAGS` got the maps
+  too), `--build-id=none`, deterministic archives. Rebuilding curl,
+  opusfile and HarfBuzz gave byte-identical `.a` files; no archive contains
+  a `/home` or SDK path.
+
+**Gradle project** (`android/`), from SDL 3.4.18's `android-project`:
+
+| | |
+|---|---|
+| Gradle wrapper | 9.9.2, `distributionSha256Sum` pinned |
+| Android Gradle Plugin | 9.5.2 |
+| Kotlin | 2.4.21 (AGP 9's built-in Kotlin; the plugin is listed only to pin the version) |
+| JDK | 21 (Debian), Java/Kotlin target 17 bytecode |
+| SDK | compile 36, target 36, min 33 |
+| NDK / CMake | 28.2.13676358 / 3.31.6 |
+| ABIs | debug: arm64-v8a and x86_64; release: arm64-v8a |
+
+- Build files are Kotlin script (`*.gradle.kts`), not the template's Groovy.
+- versionName from `android/VERSION`, versionCode from `android/BUILD`;
+  APK `dxgarden-<version>-b<build>-<type>.apk`
+  (`app/build/outputs/apk/debug/dxgarden-0.9.0-b1-debug.apk`).
+- SDL's Java (`org.libsdl.app`) is copied unchanged from 3.4.18 and must be
+  replaced whenever SDL is updated. Its `onBackPressed` gives the one
+  deprecation note in the build; back handling comes in A2/A4.
+- `MainActivity` (Kotlin) extends `SDLActivity`; the manifest turns on
+  `enableOnBackInvokedCallback` and asks for OpenGL ES 3.0, `INTERNET` and
+  `VIBRATE`. The launcher icons are SDL's placeholders until A6.
+- `android/jni/` holds the native app: `CMakeLists.txt` and `src/main.c`.
+  The A0 `main.c` logs its version and draws a plain blue screen.
+- AGP 9 refuses `proguard-android.txt` (it has `-dontoptimize`); the
+  release type uses `proguard-android-optimize.txt` (minify is off for now).
+
+**Headless checks, all passed:**
+
+- `dxgarden_test` on the emulator (x86_64, Android 16, 16 KB pages): 4755
+  checks, 0 failures, exit 0, no compiler warnings. The arm64-v8a test
+  binary cross-builds; it runs on the phone once paired.
+- `./gradlew assembleDebug` from the command line. In the APK:
+  versionCode 1, versionName 0.9.0, minSdk 33, targetSdk 36; both
+  `libmain.so` files stored 16 KB-aligned (`zipalign -c -P 16`) with LOAD
+  segments aligned to 0x4000; no build ID and no build paths in them.
+- A clean rebuild gives byte-identical `libmain.so` (both ABIs) and dex
+  files. (Same folder; a build from a different folder is for A7.)
+- Installed and launched with `adb shell am start -W`: starts in about
+  0.6 s; logcat `SDL/APP: DX Garden 0.9.0 build 1 starting (SDL 3.4.18)`,
+  renderer `opengles2`. The screenshot shows the blue filling the screen
+  behind the status and gesture bars.
+
+**Surprises:**
+
+- SDL checks whether `SDL_MAIN_USE_CALLBACKS` is *defined*, so
+  `#define SDL_MAIN_USE_CALLBACKS 0` turns callbacks on.
+- `SDL_WINDOW_FULLSCREEN` on Android means immersive mode (system bars
+  hidden, with a "Viewing full screen" prompt). We want edge-to-edge with
+  the bars showing, so the window is created without it.
+- `tests/test_library.c` made its temporary folder under `/tmp`, which
+  Android doesn't have; it now uses `TMPDIR` first. The tests' testdata
+  path is a CMake cache variable (`DXG_TESTDATA_DIR`), and the sanitizers
+  are an option (`DXG_SANITIZE`, on for the PC, off for the NDK build).
+
+**Known issues:** none blocking. The phone isn't paired yet (instructions
+come at the A1 checkpoint).
 
 ---
 

@@ -81,11 +81,24 @@ add_executable(dxgarden_test
     tests/test_hls.c
 )
 target_include_directories(dxgarden_test PRIVATE core)
+# Where the tests read testdata/ from. tools/android_test.sh builds with
+# the folder it pushes testdata/ to on the device.
+set(DXG_TESTDATA_DIR "${CMAKE_SOURCE_DIR}/testdata" CACHE STRING "testdata/ at run time")
 target_compile_definitions(dxgarden_test PRIVATE
-                           DXG_TESTDATA_DIR="${CMAKE_SOURCE_DIR}/testdata")
+                           DXG_TESTDATA_DIR="${DXG_TESTDATA_DIR}")
 target_compile_options(dxgarden_test PRIVATE -Wall -Wextra -Wpedantic -g)
-target_compile_options(dxgarden_test PRIVATE -fsanitize=address,undefined)
-target_link_options(dxgarden_test PRIVATE -fsanitize=address,undefined)
+# AddressSanitizer and UBSan on the PC. Off for the NDK build: an ASan
+# executable on Android needs its runtime pushed alongside it.
+if(ANDROID)
+    set(DXG_SANITIZE_DEFAULT OFF)
+else()
+    set(DXG_SANITIZE_DEFAULT ON)
+endif()
+option(DXG_SANITIZE "Build the tests with ASan and UBSan" ${DXG_SANITIZE_DEFAULT})
+if(DXG_SANITIZE)
+    target_compile_options(dxgarden_test PRIVATE -fsanitize=address,undefined)
+    target_link_options(dxgarden_test PRIVATE -fsanitize=address,undefined)
+endif()
 target_link_libraries(dxgarden_test ZLIB::ZLIB m)
 
 # The station-list builder from the command line, to compare it with
