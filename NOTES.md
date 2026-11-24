@@ -323,6 +323,87 @@ static, min SDK 33, `c++_static`.
 **Known issues:** none blocking. The phone isn't paired yet (instructions
 come at the A1 checkpoint).
 
+## A1: one stream (build 2, 2026-11-24)
+
+**What it does.** The app starts on a plain screen and plays SomaFM Groove
+Salad (MP3 128 kbps, HTTPS) through the Linux app's player and decoders.
+The screen's colour shows the state: night blue while connecting or
+buffering, green playing, amber reconnecting, red on an error. There's no
+other interface yet.
+
+**From the Linux app** (`android/jni/src/`, copied from DX-Garden-Linux's
+`linux/` at the split): `player.c`/`.h` (curl network thread, ICY, HLS,
+playlists, reconnects, SDL audio stream), `decode.c`/`.h` (mpg123, faad2,
+Vorbis, Opus, FLAC), `log.c`/`.h`. Changes:
+
+- **Certificates:** the Linux search of `/etc/ssl` is gone. curl's Mozilla
+  CA bundle (`cacert-2026-11-05.pem`, 118 certificates, MPL 2.0) is in the
+  APK as `assets/cacert.pem`, read once with `SDL_LoadFile` and given to
+  curl from memory (`CURLOPT_CAINFO_BLOB`, which curl's Mbed TLS backend
+  supports). `tools/update_cacert.sh` fetches a given dated bundle and
+  checks its SHA-256; the file is committed so builds need no network.
+- **Log:** every line goes to logcat (tag `DXGarden`) as well as to
+  `log-<version>-b<build>.txt` in the external files folder
+  (`Android/data/systems.hiraeth.dxgarden/files/`), with the previous run
+  kept as `-previous.txt`, as on Linux.
+- **Status:** `player_status.frames_out`, the stereo frames handed to the
+  audio device. The decoder waits when SDL's queue is full, so this rises
+  at the stream's sample rate only while the device is really taking
+  audio. That's the "samples written" check without ears.
+- User agent `DXGarden/0.9.0 (Android)`.
+- `cmake/core_sources.cmake` now holds the `core/` file list, used by both
+  the PC build and `android/jni/CMakeLists.txt`.
+
+**Test mode.** In debug builds, `MainActivity` turns intent extras into the
+Linux options: `-e play URL -e seconds N` plays for N seconds, logs a
+status line each second and closes the app with `result: played` in the
+log. Release builds ignore extras, so other apps can't drive them.
+`tools/android_play_test.sh [-s serial] [-t secs] [URL...]` runs a list of
+streams this way and prints the decoder, last status and result for each.
+
+**Headless checks (emulator, x86_64, Android 16, 16 KB pages), all
+passed**, 15 s each, no underruns, decode load under 1%:
+
+| Format | Stream | Result |
+|---|---|---|
+| MP3 128 | SomaFM Groove Salad | played, ICY title and station site |
+| AAC LC 320 | Radio Paradise | played, title |
+| HE-AAC 32 | SomaFM Groove Salad | played |
+| Opus | Deutschlandfunk | played (48 kHz) |
+| Opus, chained | Nightwave Plaza | played, title |
+| Ogg Vorbis | Energy 90s (Bulgaria) | played, title from Vorbis comments |
+| FLAC in Ogg | Radio Paradise Rock FLAC | played, 955 kbps |
+| FLAC | Rondo Classic Klasu | played |
+| HLS (HE-AAC in TS) | BBC Radio 4 | played (48 kHz) |
+| PLS playlist | SomaFM Groove Salad | followed to the MP3 stream, played |
+
+Every run logged `frames out` rising at the stream's rate (about 44,100 or
+48,000 a second) through SDL's AAudio driver. TLS: Mbed TLS 3.6.7 with the
+bundled certificates, about 0.7 s to the handshake. `dxgarden_test` still
+passes on the emulator after the CMake changes.
+
+**Surprises:**
+
+- Nightwave Plaza's `/ogg` stream is Opus, not Vorbis; a Vorbis station
+  was found by reading the first Ogg page of Radio Browser's most-clicked
+  Ogg stations.
+- When `main` returns (end of a test run), the activity closes but Android
+  keeps the process. On the next launch SDL sees its native code has
+  already run and ends the process, and Android starts a fresh one, so
+  the C code always starts clean. (Seen in logcat: "has died ...
+  restarted".) Nothing to do, but worth knowing.
+- The emulator with `-no-audio` still has a working AAudio output (to
+  nowhere), so playback can be tested headless without sound on Saoirse.
+
+**Known issues (for later milestones):**
+
+- Going to the home screen pauses the audio and the main loop (SDL's
+  default); it resumes on return. Background playback is A3.
+- The arm64-v8a library has only been run on the phone (see checkpoint).
+- Nothing is shown on screen but a colour; the interface is A2 and A4.
+
+**Checkpoint [me]:** does it sound right on the phone, in every format?
+
 ---
 
 (The Linux and Vita notes follow, unchanged from DX-Garden-Linux.)

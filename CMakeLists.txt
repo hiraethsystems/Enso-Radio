@@ -25,38 +25,8 @@ endif()
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Building a station list from Radio Browser:
-# portable C, plus zlib for GeoNames' zip.
-set(RB_SOURCES
-    core/json.c
-    core/rb_build.c
-    core/unitab.c
-    core/ustr.c
-    core/zip_read.c
-)
-
-set(CORE_SOURCES
-    core/bidi_order.c
-    core/config.c
-    core/controls.c
-    core/globe.c
-    core/hls.c
-    core/icy.c
-    core/library.c
-    core/load_report.c
-    core/media_demux.c
-    core/playlist.c
-    core/ring_buffer.c
-    core/search.c
-    core/station.c
-    core/stations_file.c
-    core/stream_buffer.c
-    core/stream_info.c
-    core/strmap.c
-    core/text.c
-    core/track_info.c
-    core/userlist.c
-)
+set(DXG_CORE_ROOT "${CMAKE_SOURCE_DIR}")
+include(cmake/core_sources.cmake)
 
 # The app is not built here. DXG_APP is kept so the Linux-era command line
 # (-DDXG_APP=OFF) still works; ON is refused rather than silently ignored.
