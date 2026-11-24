@@ -49,6 +49,7 @@ add_executable(dxgarden_test
     tests/test_bidi.c
     tests/test_stream.c
     tests/test_hls.c
+    tests/test_sun.c
 )
 target_include_directories(dxgarden_test PRIVATE core)
 # Where the tests read testdata/ from. tools/android_test.sh builds with

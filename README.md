@@ -45,18 +45,24 @@ python3 -I tools/test_rb_to_stations.py
 ## Credits and licences
 
 - DX Garden is licensed under the GNU GPL v3 (see `LICENSE`).
-- To be linked into the app: SDL3 (zlib licence), libcurl (curl licence),
+- Linked into the app: SDL3 (zlib licence), libcurl (curl licence),
   Mbed TLS (Apache 2.0), mpg123 (LGPL 2.1), faad2 (GPL 2 or later),
   libogg, libvorbis, Opus, opusfile and libFLAC (BSD), FreeType (FreeType
-  licence), HarfBuzz (MIT), FriBidi (LGPL 2.1) and zlib (zlib licence).
+  licence), HarfBuzz (MIT), FriBidi (LGPL 2.1), zlib (zlib licence) and
+  stb_image (public domain or MIT).
 - Unicode tables made from the Unicode Character Database (Unicode
   licence).
 - Fonts: Liberation Sans, and Noto Sans, Noto Sans Arabic, Hebrew, Thai,
   Georgian and Ethiopic, and a subset of Noto Sans CJK SC made by
   `tools/make_fonts.py`; all SIL Open Font License 1.1
   (`assets/fonts/OFL.txt`, `assets/fonts/OFL-Liberation.txt`).
-- Globe imagery from NASA Blue Marble: Next Generation (Reto Stöckli, NASA
-  Earth Observatory; public domain).
+- Globe imagery from NASA: Blue Marble: Next Generation (Reto Stöckli,
+  NASA Earth Observatory) for the day side, and Black Marble 2016 (NASA
+  Earth Observatory images by Joshua Stevens, using Suomi NPP VIIRS data
+  from Miguel Román, NASA Goddard Space Flight Center) for the night side.
+  NASA imagery is not under copyright in the US; its use here implies no
+  endorsement by NASA. `tools/make_earth.py` downloads the source images
+  and builds the app's tile packs.
 - Station lists made with `tools/rb_to_stations.py`, and lists the app
   downloads, come from Radio Browser (radio-browser.info), whose API
   documentation says it may be used in free and non-free software and its

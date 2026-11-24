@@ -20,7 +20,10 @@ include("${DXG_ROOT}/cmake/core_sources.cmake")
 
 add_library(main SHARED
     ${CORE_SOURCES}
+    src/bridge.c
     src/decode.c
+    src/earth.c
+    src/globe_view.c
     src/log.c
     src/main.c
     src/player.c
@@ -46,4 +49,4 @@ foreach(lib curl mbedtls mbedx509 mbedcrypto everest p256m
             mpg123 faad opusfile opus vorbisfile vorbis FLAC ogg z)
     target_link_libraries(main PRIVATE "${DXG_TP}/lib/lib${lib}.a")
 endforeach()
-target_link_libraries(main PRIVATE SDL3::SDL3-static android log m)
+target_link_libraries(main PRIVATE SDL3::SDL3-static GLESv3 EGL android log m)

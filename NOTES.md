@@ -412,6 +412,128 @@ core. Aisling listened: **all formats sound right.** A1 done.
 The phone uses 4 KB pages, so 16 KB page support is covered only by the
 16 KB emulator image; a 16 KB device would be needed to test it for real.
 
+## A2: the globe (builds 3 to 6, 2026-11-24)
+
+**Imagery (Aisling agreed to both layers, 2026-11-24).** Both are level 6:
+65536 x 32768 px for the whole Earth, about 600 m a pixel, which uses
+nearly all of NASA's 500 m sources.
+
+| Pack | Source | Tiles | Size |
+|---|---|---|---|
+| `earth-day.pack` | Blue Marble: Next Generation, July 2004, topography and bathymetry | 10,922 | 241.1 MB |
+| `earth-night.pack` | Black Marble 2016, colour, 500 m tiles | 10,922 | 118.4 MB |
+
+- Licence: NASA imagery, not under copyright in the US. NASA's media
+  guidelines ask for NASA to be credited and for no implied endorsement.
+  Credit for Black Marble 2016: NASA Earth Observatory (Joshua Stevens),
+  Suomi NPP VIIRS data from Miguel Román, NASA Goddard Space Flight
+  Center. Both are credited in the README. The night layer is bigger than
+  guessed because the 2016 colour version shows faint land and sea, not
+  plain black.
+- `tools/make_earth.py --layer day|night --max-level N` (default 6). Level
+  1 to N are now cut one 90-degree source piece at a time, and only level 0
+  joins the pieces. That keeps memory to about one source piece (2.5 GB at
+  level 6). `--max-level 5` gives the Linux pack (70.8 MB, same tiles).
+  Black Marble's eight files are pinned by SHA-256 like Blue Marble's.
+  Each pack builds in about 90 s on Saoirse.
+- The packs go in `build-earth/`, which isn't in git. Gradle stops with
+  the two commands to run if they are missing. The source images are
+  cached in `third_party/earth/`.
+- APK: the packs are stored uncompressed (`noCompress "pack"`) and read in
+  place through SDL's asset streams with seeks. The debug APK is 378 MB
+  (two ABIs). A release (arm64 only) should be about 373 MB. Installing
+  over USB took 17 s.
+
+**Station list.** `assets/stations/android/stations.txt` comes from the same
+22 November Radio Browser snapshot and command as the Linux list
+(`--bundle "for Android 0.9.0"`). It has the same 51,378 stations line for
+line; only the header differs. The first-run copy to `stations.txt` (an A5
+item) is done now because the globe needs a list: if `stations.txt` isn't
+in the files folder, the bundled one is written there. An existing file is
+never touched. The phone loads it in 195 ms: 5,285 places in 226
+countries.
+
+**Renderer** (`android/jni/src/earth.c`, from Linux `linux/earth.c`):
+- OpenGL ES 3.0 shaders (`#version 300 es`, highp). Anisotropic filtering
+  when the driver has it; the phone's Adreno 830 does.
+- Two layers. Each tile is drawn from the day and night tiles (or their
+  nearest loaded ancestors) and blended by the Sun's angle. Daylight fades
+  over civil twilight (about 6 degrees either side of the terminator), with
+  a gentle darkening towards it on the day side. The haze and atmosphere
+  glow dim on the night side. A tile wholly in day or night (with an 8
+  degree margin) loads only the layer it shows.
+- The Sun: `core/sun.c` (new, portable C99) gives the subsolar point from
+  the time, using the Astronomical Almanac's low-precision formulas. Its
+  tests in `tests/test_sun.c` check the equinox, both solstices and two
+  equation-of-time dates: 4,762 checks in all, passing on the PC, the
+  emulator and the phone. The terminator follows the real time.
+- The field of view (40 degrees) spans the screen's shorter side, so the
+  whole Earth fits a portrait phone. Linux used the height.
+- The crosshair is drawn in GL: a white ring that fills with an amber arc
+  as the dwell timer runs. Place dots are 0.75 dp a unit (Linux: 1 px a
+  unit at 100%), so Europe stays readable on a phone.
+- Tile cache: 320 tiles for both layers, up to about 490 MB of GPU memory
+  when full (measured on the phone after a tour of six places). Going to
+  the background frees all but levels 0-2, which took the app from 720 MB
+  to 167 MB, ready for background playback in A3.
+- A lost GL context (SDL's `SDL_EVENT_RENDER_DEVICE_RESET`) rebuilds
+  programs and buffers, and the tiles reload as they are drawn. A script
+  step forces this path: after it, the screenshot matches the one before
+  pixel for pixel.
+
+**Touch** (`android/jni/src/globe_view.c`): one finger drags the point under
+it, with a fling on release. A finger held still before lifting doesn't
+fling. Two fingers pinch to zoom about their midpoint and drag together.
+Lifting one carries on with the other. Double-tap flies to the point and
+zooms in (altitude x 0.4); two-finger tap zooms out. Tapping a dot plays
+that place. SDL's pretend mouse events are off. Tuning: the place under the
+crosshair plays after 0.8 s (as on Linux), but not while a finger is on
+the globe, and not for the place the app opens over. A light haptic tick
+(`CLOCK_TICK`) marks tuning.
+
+**Place label:** a plain Android `TextView` added by `MainActivity` over
+SDL's layout ("London, England" over "293 stations" or the station
+playing). Native code sets it, and triggers the haptic tick, through a
+small JNI bridge (`bridge.c`). It uses no library and is a stopgap: the
+Compose interface replaces it in A4.
+
+**Lifecycle:** the camera is saved to `config.ini` in the files folder on
+going to the background and at exit. SDL 3 doesn't queue the
+background/foreground events: they reach only event watchers, called right
+then, so `main.c` uses `SDL_AddEventWatch`. Android sends a low-memory
+event each time the app goes to the background (`onTrimMemory`); it's
+only logged.
+
+**Checked headless:**
+- Emulator (SwiftShader): the globe at three heights; drag and fling
+  (`input swipe`); double-tap; tuning over Dublin (8Radio played, MP3
+  320k, no underruns); rotation to landscape and back; home and back (hot
+  start, no crash); the GL rebuild.
+- Phone over USB: the same screens; 120 frames a second; the label under
+  the crosshair; memory before and after home; the core tests.
+
+**Test options (debug builds):** `-e goto "LAT LON ALT"`, `-e time UNIX` (fix
+the Sun), `-e screenshot FILE -e frames N`, and `-e script` with `wait N`,
+`sleep MS`, `goto`, `camera`, `shot FILE`, `glreset` and `quit`. A1's
+`-e play URL -e seconds N` still works.
+
+**Known issues:**
+- Below about 100 km the night lights are blocky. That's in NASA's source
+  (500 m cells, sharp-edged), not the filtering. They could be softened
+  with a blur when the pack is built, which wouldn't lose detail but would
+  change the look. Left as it is for Aisling to judge.
+- Not testable headless (`adb shell input` has one finger): pinch,
+  two-finger tap, and the haptic tick.
+- The crosshair and label are at the screen's centre, not the centre of
+  the area left by the status and navigation bars. They'll move when the
+  A4 sheet takes part of the screen.
+- Audio still pauses in the background (A3).
+- A dwell plays a place's first station (alphabetical), as on Linux.
+- GPU memory: 320 tiles is fine on the S25 Ultra. Phones with less memory
+  are untested; the cache size could follow the device's memory class.
+
+**Checkpoint [me]:** how the globe looks and feels under a finger.
+
 ---
 
 (The Linux and Vita notes follow, unchanged from DX-Garden-Linux.)

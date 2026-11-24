@@ -14,6 +14,20 @@ require(Regex("^([0-9]|[1-9][0-9])\\.[0-9]\\.[0-9]$").matches(dxgVersion)) {
 }
 require(Regex("^[1-9][0-9]*$").matches(dxgBuild)) { "android/BUILD must be a whole number: '$dxgBuild'" }
 
+// The globe imagery is built by tools/make_earth.py into build-earth/ (not in
+// git: 360 MB). The APK isn't worth having without it, so stop with the
+// commands to make it.
+val earthDir = File(rootDir, "../build-earth")
+for (pack in listOf("earth-day.pack", "earth-night.pack")) {
+    if (!File(earthDir, pack).isFile) {
+        throw GradleException(
+            "build-earth/$pack is missing. Make the globe imagery first, from the repository root:\n" +
+            "  python3 -I tools/make_earth.py --layer day --out build-earth\n" +
+            "  python3 -I tools/make_earth.py --layer night --out build-earth"
+        )
+    }
+}
+
 // APK name: dxgarden-<version>-b<build>-<buildtype>.apk
 base {
     archivesName.set("dxgarden-$dxgVersion-b$dxgBuild")
@@ -65,6 +79,19 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        getByName("main") {
+            // cacert.pem; the bundled station list; the globe imagery.
+            assets.srcDirs("src/main/assets", "../../assets/stations/android", earthDir.path)
+        }
+    }
+
+    androidResources {
+        // The packs are read in place with seeks, so they must be stored,
+        // not deflated. (JPEG tiles wouldn't shrink anyway.)
+        noCompress += "pack"
     }
 
     packaging {

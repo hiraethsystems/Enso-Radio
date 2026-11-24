@@ -29,6 +29,7 @@ set(CORE_SOURCES
     ${DXG_CORE_ROOT}/core/stream_buffer.c
     ${DXG_CORE_ROOT}/core/stream_info.c
     ${DXG_CORE_ROOT}/core/strmap.c
+    ${DXG_CORE_ROOT}/core/sun.c
     ${DXG_CORE_ROOT}/core/text.c
     ${DXG_CORE_ROOT}/core/track_info.c
     ${DXG_CORE_ROOT}/core/userlist.c
