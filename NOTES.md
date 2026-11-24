@@ -156,6 +156,9 @@ Everything runs from Saoirse's command line.
   cable. Left for a person: what it sounds like, how gestures feel, lock
   screen and Bluetooth controls, the notification, and battery drain over a
   long listen.
+- **Install with `adb install --user 0`.** The S25 Ultra has a Dual
+  Messenger profile (user 95), and a plain `adb install` puts the app there
+  too, which gave a second icon (found with build 16).
 
 ## Milestones
 
@@ -803,6 +806,27 @@ used (its current version also needs SDK 37).
 - Download Station List (in the menu) and adding stations come in A5.
 - Not measured: how smooth the sheet and lists are on slower phones than
   the S25 Ultra.
+
+### Build 17 and 18: icon, author, one install (2026-11-24)
+
+- **The icon** is the Linux app's (`linux/share/club.hiraeth.dxgarden.png`,
+  the Vita LiveArea bubble cropped to a circle: an orthographic globe drawn
+  from the app's own Natural Earth map, so no outside artwork). It is the
+  adaptive icon's foreground at 74 dp of 108, slightly past the launcher's
+  circle, on its own rim colour (#0E1116), so any launcher shape blends in.
+  SDL's placeholder icon is gone. Build 17 tried a new vector drawing;
+  Aisling asked for the Linux icon instead. That drawing's line version
+  stays as the monochrome layer, for Android's themed icons, since the
+  picture itself can't be tinted.
+- **Known issue:** the picture only exists at 128 px (the script that drew
+  it, on an old cloud branch, is gone), so it's upscaled 2.3 times and a
+  little soft at large icon sizes. Drawing it again at full size from the
+  same map would fix that.
+- **About:** the author is "Aisling de Grás (Diệu An)",
+  aisling@hiraeth.systems, as Aisling gave them.
+- **Two icons on the phone:** the second was a copy installed in Samsung's
+  Dual Messenger profile by `adb install`; removed with `pm uninstall
+  --user 95`, and installs now use `--user 0` (see Testing).
 
 ---
 

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The rim colour of the icon picture, so any launcher shape blends in. -->
+    <color name="ic_launcher_background">#FF0E1116</color>
+</resources>

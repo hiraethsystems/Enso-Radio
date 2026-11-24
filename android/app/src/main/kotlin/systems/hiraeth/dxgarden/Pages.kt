@@ -346,8 +346,8 @@ fun SettingsPage() {
 // ---- About ----
 
 /** The author's name and email, as Aisling wants them shown. */
-private const val AUTHOR = "Aisling"
-private const val AUTHOR_EMAIL = "aisling@hiraeth.club"
+private const val AUTHOR = "Aisling de Grás (Diệu An)"
+private const val AUTHOR_EMAIL = "aisling@hiraeth.systems"
 
 @Composable
 fun AboutPage() {

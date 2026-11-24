@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DX Garden's icon: the Linux and Vita app's globe picture
+     (linux/share/club.hiraeth.dxgarden.png in DX-Garden-Linux, drawn from
+     the app's own Natural Earth map), on its rim colour. The monochrome
+     layer, for themed icons, is a line drawing of the same idea. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>
