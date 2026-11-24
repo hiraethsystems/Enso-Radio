@@ -1,3 +1,245 @@
+# DX Garden for Android: design notes and known issues
+
+> This repository was split from `hiraethsystems/DX-Garden-Linux` on
+> 2026-11-24. The notes from the Linux app (and the Vita app before it) are
+> kept below the Android section, because the shared `core/` and the station
+> list rules come from them.
+
+A running log of decisions, in plain terms. Newest milestone at the bottom of
+the Android section.
+
+## Decisions before A0 (2026-11-24)
+
+| Question | Decision |
+|---|---|
+| Repository | New repo `hiraethsystems/DX-Garden-Android`, split from DX-Garden-Linux with its history |
+| Test hardware | Samsung Galaxy S25 Ultra, wireless adb; as much as possible headless on Saoirse |
+| Oldest Android | Android 13 (min SDK 33); target and compile SDK 36 |
+| Distribution | GitHub APK and F-Droid only |
+| Application ID | `systems.hiraeth.dxgarden` (reverse of hiraeth.systems; if that domain isn't ours, use `io.github.hiraethsystems.dxgarden` instead, as F-Droid rejects IDs that match someone else's domain) |
+| Look | Modern Android, Material 3, no 9x look (see "Interface") |
+| User files | `Android/data/systems.hiraeth.dxgarden/files/`, edited from a computer over USB |
+| Globe imagery | Full detail, no cuts for size (see "Globe imagery") |
+| ABIs | `arm64-v8a` for releases, `x86_64` for the emulator in debug builds |
+| Mobile data | No warning or setting |
+
+Why min SDK 33: everything the app needs is there (AAudio, OpenGL ES 3.2,
+Material You colours, themed icons, the notification permission, predictable
+storage rules), it avoids old-device workarounds, and it still covers most
+phones in use. Android 12 and older are left out.
+
+Known consequence of the user folder: Android deletes
+`Android/data/<app id>/` when the app is uninstalled, favourites and edits
+included. The README must say so and suggest copying `stations.txt` and
+`favourites.txt` off over USB first. On the phone itself, only the built-in
+Files app can see that folder; third-party file managers can't.
+
+## How the Linux code maps to Android
+
+| Linux | Android |
+|---|---|
+| `core/` | Unchanged; built by the NDK as part of the native library |
+| Decoders, curl + Mbed TLS, text libraries | Same libraries, cross-built per ABI by `tools/build_android_deps.sh` |
+| OpenGL 3.3 core shaders | OpenGL ES 3.0 (`#version 300 es`, precision qualifiers) |
+| `earth-day.pack` read with `fopen` | Stored uncompressed in the APK, opened as a file descriptor plus offset |
+| XDG data folder | App external files folder (see above) |
+| System CA certificates (`SSL_CERT_FILE`) | curl's Mozilla CA bundle shipped in the APK |
+| KDE/GNOME theme reading | System light/dark and Material You colours, from Kotlin |
+| 9x toolkit, menus, child windows | Replaced by the Compose interface |
+| Mouse and keyboard on the globe | Touch gestures (see "Interface") |
+| Plays while the window is open | Foreground playback service (A3) |
+| `--script`, `--screenshot` | Kept, passed as intent extras, for headless testing |
+
+SDL notes:
+- SDL's Android template still targets SDK 35 and overrides `onBackPressed`;
+  we target 36 and handle back with `OnBackInvokedCallback`.
+- SDL's activity puts its surface in a `RelativeLayout` (`mLayout`), which is
+  where the Compose interface is added on top.
+- The GL context can be lost when the app goes to the background and comes
+  back. Globe tiles, atlases and shaders need a "rebuild everything" path.
+- To keep audio playing in the background: `SDL_HINT_ANDROID_BLOCK_ON_PAUSE`
+  off and `SDL_HINT_ANDROID_BLOCK_ON_PAUSE_PAUSEAUDIO` off, plus the
+  foreground service so Android doesn't stop the process.
+
+## Interface
+
+The globe fills the screen, edge to edge. Everything else is Material 3
+(Jetpack Compose) drawn over it, in DX Garden's own colours, with an option
+to follow the phone's Material You colours instead.
+
+Why Compose over the globe rather than our own C toolkit: it gets TalkBack
+(screen reader) support, the system keyboard, font scaling, proper scrolling
+for lists of 50,000 stations, predictive back and Material You for free.
+Drawing all that ourselves in OpenGL would be a lot of code and still worse
+for accessibility. The price is a JNI bridge between the Kotlin interface and
+the C core, and two languages in one app.
+
+### Portrait (phones)
+
+- **Globe:** full screen, with a crosshair ring in the middle. Under it, a
+  small label with the place being tuned ("Swansea, Wales").
+- **Top:** a floating search bar (stations, places, genres), with a menu for
+  Settings, Download Station List and About.
+- **Bottom sheet**, dragged between three heights:
+  - *Peek:* the tuned place, its country and how many stations it has.
+  - *Half:* that place's stations; tap one to play it.
+  - *Full:* tabs for Browse (country, then city, or by genre), Favourites and
+    Recent.
+- **Mini player**, docked above the sheet: station name, artist and title
+  when the station sends them, play/stop and favourite. Tapping it opens Now
+  Playing (station details, website link, sleep timer).
+
+### Landscape, tablets and foldables
+
+The sheet becomes a side panel on the left and the globe takes the rest.
+Same content, no separate screens.
+
+### The globe by touch
+
+- One-finger drag spins it, with momentum when flung.
+- Pinch zooms. Double-tap zooms in, two-finger tap zooms out.
+- A light haptic tick when the crosshair tunes to a new place.
+- Place dots as on Linux: orange for towns, light blue for Country-wide places.
+
+### Outside the app
+
+- Notification and lock screen controls through MediaSession, and headset
+  and Bluetooth buttons.
+- Pauses for phone calls (audio focus) and stops when headphones are
+  unplugged.
+- A themed (monochrome) app icon as well as the normal one.
+
+## Globe imagery
+
+The Linux pack goes to level 5 (32768 px around the equator, about 1.2 km a
+pixel). NASA's Blue Marble pieces are 21600 px each, 86400 px around the
+equator (about 500 m a pixel), so a level 6 (65536 px, about 600 m a pixel)
+uses nearly all of the source's detail. Plan for A2:
+
+- Build level 6. Size estimate (a guess until it's built): the extra level
+  has four times the tiles of level 5, so roughly 250 to 300 MB for the pack,
+  against about 70 MB now.
+- Look at a night side with city lights (NASA's Black Marble) and the
+  terminator moving with the real time, keeping the current atmosphere glow.
+  Check its licence before using it.
+- Check whether a free, higher-resolution global source exists that would be
+  worth more levels.
+
+**Open question for release (A7): F-Droid and a large APK.** F-Droid builds
+the app from source, so the pack would be built on F-Droid's servers from the
+NASA downloads, and a 300 MB APK may be more than it accepts. An F-Droid post
+from 2017 talks of a 100 MB APK limit and offers OBB expansion files instead;
+that needs checking against current practice. Options: the pack inside the
+APK if F-Droid accepts it, an OBB file, or a separate download on first run
+that the user agrees to. GitHub releases have no such problem, so GitHub
+comes first.
+
+## Testing
+
+Everything runs from Saoirse's command line.
+
+- **Unit tests:** `core/` tests on the PC as now, and the same tests
+  cross-built with the NDK, pushed with adb and run on the emulator and the
+  phone.
+- **Emulator:** a headless `x86_64` Android 16 emulator on Saoirse (needs
+  KVM, run with `-no-window`, software OpenGL ES). Used for installs,
+  screenshots, scripted input, lifecycle tests and logs.
+- **Scripted runs:** the Linux `--script` and `--screenshot` options, passed
+  as intent extras (`adb shell am start ... -e script "..."`), plus
+  `adb shell input` for real touch events and `adb exec-out screencap` for
+  screenshots.
+- **Checks without ears:** the log records connect, buffer, decode and
+  samples written to the audio device, so playback can be confirmed without
+  listening. `dumpsys media_session` checks the MediaSession;
+  `am start` / home / `input keyevent` test going to the background and back.
+- **The phone:** paired for wireless adb, so builds install and run without a
+  cable. Left for a person: what it sounds like, how gestures feel, lock
+  screen and Bluetooth controls, the notification, and battery drain over a
+  long listen.
+
+## Milestones
+
+Run in one go. `BUILD` goes up for every build. **[me]** marks a checkpoint
+where work stops until Aisling has tested on the phone; everything else
+carries straight on once its headless checks pass.
+
+- **A0. Repository and toolchain.** Split the repo from DX-Garden-Linux.
+  Install the Android SDK command-line tools, NDK and an emulator image on
+  Saoirse. `tools/build_android_deps.sh`. Gradle project from SDL's template,
+  moved to SDK 36. `core/` tests run on the emulator.
+- **A1. One stream.** The app starts, shows a plain screen and plays one
+  built-in stream through the existing player and decoders. Logs to a file
+  and to logcat. Proves curl, TLS, certificates, decoders and audio.
+  **[me]** Does it actually sound right on the phone, every format?
+- **A2. The globe.** OpenGL ES shaders, the level 6 imagery from the APK,
+  touch gestures, the crosshair tuning to places, the bundled station list
+  and place dots, edge-to-edge, and surviving the home screen and rotation.
+  **[me]** How the globe looks and feels under a finger.
+- **A3. Background playback.** Playback service, notification, MediaSession,
+  audio focus, headphones unplugged, Wi-Fi lock, and stopping cleanly.
+  **[me]** Lock screen, notification, Bluetooth, a call coming in, a long
+  listen with the screen off.
+- **A4. The interface.** Compose over the globe: search, bottom sheet, mini
+  player, Now Playing, Browse, Favourites, Recent, Settings, the landscape
+  and tablet layout, predictive back, TalkBack labels.
+  **[me]** The whole interface, before it's polished further.
+- **A5. Your stations.** First-run copy of the bundled list, `import/`,
+  Add Station by URL, Open with DX Garden, Download Station List.
+- **A6. GitHub release.** Icons, signing, README, licences screen, release
+  APK tagged `android-v0.9.0`. **[me]** Final check before the release is
+  published.
+- **A7. F-Droid.** Reproducible build checks, F-Droid metadata, the imagery
+  size question above, submission.
+
+## A0: repository and toolchain (in progress)
+
+**Repository split (2026-11-24).** Made like DX-Garden-Linux was made from
+DX-Garden: a fresh clone of DX-Garden-Linux, then `git filter-repo
+--invert-paths` on `linux/`, `cmake/linux.cmake`, `tools/make_appimage.sh`,
+`tools/build_linux_deps.sh` and `assets/stations/linux/`, so those are gone
+from the history too. The Linux screenshot is removed in the split commit,
+as the Vita screenshots were in the Linux split. All 40 commits are kept.
+Working copy: `~/Dev/DX-Garden-Android` on Saoirse.
+
+- `CMakeLists.txt` now builds only `dxgarden_test` and `dxgarden_listtool`,
+  reading `android/VERSION` and `android/BUILD`. `-DDXG_APP=OFF` still
+  works; `ON` stops with a message pointing at Gradle.
+- `cmake/revision.cmake` is kept (the short git commit for the About
+  screen); nothing uses it until the native build does.
+- Core tests on Saoirse after the split: `dxgarden_test` 4755 checks,
+  0 failures, no warnings; `test_rb_to_stations.py` 27 tests OK.
+- The GitHub repo had one commit made by GitHub (a LICENSE); Aisling agreed
+  the split history is force-pushed over it.
+
+**Toolchain on Saoirse.** `~/Android/Sdk` already existed (cmdline-tools
+23.0, platform 37, NDK 30.0.16248370, CMake 4.1.2, an API 37 AVD); kept as
+it is, with these added by `sdkmanager`:
+
+| Package | Version | Why |
+|---|---|---|
+| `platforms;android-36` | r02 | compile SDK 36 |
+| `build-tools;36.1.0` | 36.1.0 | |
+| `ndk;28.2.13676358` | r28c | the version SDL 3.4.18's `android-project` pins (its README only asks for r15c or later) |
+| `cmake;3.31.6` | 3.31.6 | same as Saoirse's own CMake |
+| `emulator` | 37.3.10 | |
+| `platform-tools` | 37.0.3 | |
+| `system-images;android-36;google_apis_ps16k;x86_64` | r07 | Android 16 with **16 KB pages**, so the emulator checks our alignment; Google's 16 KB images only come with Google APIs (emulator only, nothing in the app) |
+
+No new licence had to be accepted. Java is Debian's OpenJDK 21.0.13. KVM:
+`/dev/kvm` is readable and writable through a user ACL.
+
+AVD `dxg_api36` (Pixel 8 profile): boots with `-no-window -gpu
+swiftshader_indirect` in about 20 s; reports Android 16, SDK 36,
+`PAGE_SIZE` 16384, GLES "OpenGL ES 3.0 SwiftShader".
+
+Still to do in A0: `tools/android_env.sh`, `tools/emulator.sh`,
+`tools/build_android_deps.sh`, the Gradle project, the core tests on the
+emulator, the debug APK.
+
+---
+
+(The Linux and Vita notes follow, unchanged from DX-Garden-Linux.)
+
 # DX Garden: design notes and known issues
 
 > **This repository is DX Garden for Linux (split out 2026-11-24).** It was

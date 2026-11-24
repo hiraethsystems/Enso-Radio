@@ -1,14 +1,14 @@
 cmake_minimum_required(VERSION 3.16)
 
-# DX Garden for Linux:
-#   cmake -S . -B build-linux -G Ninja            the app, the tests and the list tool
-#   cmake -S . -B build-test -DDXG_APP=OFF        core/ unit tests only (no SDL needed)
+# DX Garden for Android, the PC side:
+#   cmake -S . -B build-test -DDXG_APP=OFF        core/ unit tests and the list tool
+# The app itself is built with Gradle from android/ (./gradlew assembleDebug).
 project(dxgarden C)
 
-# Versions (README, "Versions"), in linux/:
+# Versions, in android/ (also read by Gradle for versionName and versionCode):
 #   VERSION  the release version, MAJOR.MINOR.PATCH, minor and patch 0-9.
 #   BUILD    goes up by one for every build handed over for testing.
-set(DXG_APP_DIR "${CMAKE_SOURCE_DIR}/linux")
+set(DXG_APP_DIR "${CMAKE_SOURCE_DIR}/android")
 file(STRINGS "${DXG_APP_DIR}/VERSION" DXG_VERSION LIMIT_COUNT 1)
 file(STRINGS "${DXG_APP_DIR}/BUILD" DXG_BUILD LIMIT_COUNT 1)
 # Re-run CMake when either changes, so a bumped BUILD reaches the binary.
@@ -25,7 +25,7 @@ endif()
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Building a station list from Radio Browser (Linux only, not the Vita):
+# Building a station list from Radio Browser:
 # portable C, plus zlib for GeoNames' zip.
 set(RB_SOURCES
     core/json.c
@@ -58,10 +58,12 @@ set(CORE_SOURCES
     core/userlist.c
 )
 
-# The app (linux/). Libraries from tools/build_linux_deps.sh.
-option(DXG_APP "Build the app (off: core/ tests and the list tool only)" ON)
+# The app is not built here. DXG_APP is kept so the Linux-era command line
+# (-DDXG_APP=OFF) still works; ON is refused rather than silently ignored.
+option(DXG_APP "Build the app (the Android app is built by Gradle instead)" OFF)
 if(DXG_APP)
-    include(cmake/linux.cmake)
+    message(FATAL_ERROR "The Android app is built with Gradle from android/, "
+                        "not from this CMakeLists.txt. Use -DDXG_APP=OFF.")
 endif()
 
 find_package(ZLIB REQUIRED)
