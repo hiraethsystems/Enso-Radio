@@ -399,10 +399,18 @@ passes on the emulator after the CMake changes.
 
 - Going to the home screen pauses the audio and the main loop (SDL's
   default); it resumes on return. Background playback is A3.
-- The arm64-v8a library has only been run on the phone (see checkpoint).
 - Nothing is shown on screen but a colour; the interface is A2 and A4.
 
 **Checkpoint [me]:** does it sound right on the phone, in every format?
+
+**On the phone (2026-11-24, build 2):** Galaxy S25 Ultra (SM-S938B),
+Android 17 (API 37), arm64-v8a, 4 KB pages, over USB adb. The arm64 core
+tests passed (4755 checks, 0 failures). `tools/android_play_test.sh -t 20`
+played all 10 streams through AAudio, no underruns, decode under 1% of a
+core. Aisling listened: **all formats sound right.** A1 done.
+
+The phone uses 4 KB pages, so 16 KB page support is covered only by the
+16 KB emulator image; a 16 KB device would be needed to test it for real.
 
 ---
 
