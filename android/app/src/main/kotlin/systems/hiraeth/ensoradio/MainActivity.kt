@@ -58,7 +58,7 @@ class MainActivity : SDLActivity(), LifecycleOwner, SavedStateRegistryOwner, Vie
         AppInfo.build = info.longVersionCode.toInt()
 
         val compose = ComposeView(this).apply {
-            setContent { DxgTheme { DxgApp() } }
+            setContent { EnsoTheme { EnsoApp() } }
         }
         for (v in listOf(window.decorView, compose)) {
             v.setViewTreeLifecycleOwner(this)

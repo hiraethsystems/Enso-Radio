@@ -1,6 +1,6 @@
 /* Calls from native code into MainActivity (Kotlin), and Java strings. */
-#ifndef DXG_BRIDGE_H
-#define DXG_BRIDGE_H
+#ifndef ENSO_BRIDGE_H
+#define ENSO_BRIDGE_H
 
 #include <jni.h>
 

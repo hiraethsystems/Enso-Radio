@@ -8,7 +8,7 @@
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 . "$ROOT/tools/android_env.sh"
-SERIAL=emulator-$DXG_EMU_PORT
+SERIAL=emulator-$ENSO_EMU_PORT
 SECS=15
 while getopts s:t: o; do
     case $o in

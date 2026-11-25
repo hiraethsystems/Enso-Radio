@@ -46,13 +46,13 @@ object UiState {
 object Prefs {
     private lateinit var sp: SharedPreferences
 
-    const val COLOURS_DXG = "dxg"
+    const val COLOURS_ENSO = "enso"
     const val COLOURS_PHONE = "phone"
     const val THEME_SYSTEM = "system"
     const val THEME_LIGHT = "light"
     const val THEME_DARK = "dark"
 
-    var colours by mutableStateOf(COLOURS_DXG)
+    var colours by mutableStateOf(COLOURS_ENSO)
         private set
     var theme by mutableStateOf(THEME_SYSTEM)
         private set
@@ -64,7 +64,7 @@ object Prefs {
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("interface", Context.MODE_PRIVATE)
-        colours = sp.getString("colours", COLOURS_DXG) ?: COLOURS_DXG
+        colours = sp.getString("colours", COLOURS_ENSO).takeIf { it == COLOURS_PHONE } ?: COLOURS_ENSO
         theme = sp.getString("theme", THEME_SYSTEM) ?: THEME_SYSTEM
         haptics = sp.getBoolean("haptics", true)
         bufferKb = sp.getInt("buffer_kb", 64)

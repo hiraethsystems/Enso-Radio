@@ -14,7 +14,7 @@ the Linux app's 32768 px pack).
 
 Pack format (little-endian): tile data, then an index of
 (level u8, pad u8, x u16, y u16, pad u16, offset u64, size u32) per tile,
-then a footer: index offset u64, tile count u32, b"DXGP", version u32.
+then a footer: index offset u64, tile count u32, b"ENSO", version u32.
 
 Needs Pillow and about 2.5 GB of free memory at level 6.
 
@@ -113,7 +113,7 @@ class Pack:
         at = self.f.tell()
         for level, x, y, off, size in sorted(self.index):
             self.f.write(struct.pack("<BBHHHQI", level, 0, x, y, 0, off, size))
-        self.f.write(struct.pack("<QI4sI", at, len(self.index), b"DXGP", 1))
+        self.f.write(struct.pack("<QI4sI", at, len(self.index), b"ENSO", 1))
         self.f.close()
 
 

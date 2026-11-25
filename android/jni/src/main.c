@@ -120,8 +120,8 @@ static void open_log(void)
 {
     char path[1024];
     char prev[1024];
-    snprintf(path, sizeof(path), "%slog-%s-b%s.txt", dir, DXG_VERSION, DXG_BUILD);
-    snprintf(prev, sizeof(prev), "%slog-%s-b%s-previous.txt", dir, DXG_VERSION, DXG_BUILD);
+    snprintf(path, sizeof(path), "%slog-%s-b%s.txt", dir, ENSO_VERSION, ENSO_BUILD);
+    snprintf(prev, sizeof(prev), "%slog-%s-b%s-previous.txt", dir, ENSO_VERSION, ENSO_BUILD);
     remove(prev);
     rename(path, prev);
     log_open(path);
@@ -692,7 +692,7 @@ int main(int argc, char *argv[])
     /* Keep running when the app is paused (in the background, or the screen
      * off), so the player goes on; audio isn't paused either. */
     SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "0");
-    SDL_SetAppMetadata("Ensō Radio", DXG_VERSION, "systems.hiraeth.ensoradio");
+    SDL_SetAppMetadata("Ensō Radio", ENSO_VERSION, "systems.hiraeth.ensoradio");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return 1;
@@ -701,8 +701,8 @@ int main(int argc, char *argv[])
     lists_lock = SDL_CreateMutex();
     dir = data_dir();
     open_log();
-    LOG("Ensō Radio %s (build %s), Android (API %d), SDL %d.%d.%d, data in %s", DXG_VERSION,
-        DXG_BUILD, SDL_GetAndroidSDKVersion(), SDL_VERSIONNUM_MAJOR(SDL_GetVersion()),
+    LOG("Ensō Radio %s (build %s), Android (API %d), SDL %d.%d.%d, data in %s", ENSO_VERSION,
+        ENSO_BUILD, SDL_GetAndroidSDKVersion(), SDL_VERSIONNUM_MAJOR(SDL_GetVersion()),
         SDL_VERSIONNUM_MINOR(SDL_GetVersion()), SDL_VERSIONNUM_MICRO(SDL_GetVersion()), dir);
     LOG("audio: driver %s", SDL_GetCurrentAudioDriver());
     {

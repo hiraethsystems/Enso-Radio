@@ -295,7 +295,7 @@ fun SettingsPage() {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             SectionTitle("Colours")
             Column(Modifier.selectableGroup()) {
-                Choice("Ensō Radio", "Night blue and amber", Prefs.colours == Prefs.COLOURS_DXG) { Prefs.changeColours(Prefs.COLOURS_DXG) }
+                Choice("Ensō Radio", "Night blue and amber", Prefs.colours == Prefs.COLOURS_ENSO) { Prefs.changeColours(Prefs.COLOURS_ENSO) }
                 Choice("Your phone's colours", "From your wallpaper (Material You)", Prefs.colours == Prefs.COLOURS_PHONE) {
                     Prefs.changeColours(Prefs.COLOURS_PHONE)
                 }

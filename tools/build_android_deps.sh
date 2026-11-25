@@ -28,7 +28,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 TP="$ROOT/third_party"
 SRC="$TP/src"
 JOBS=$(nproc 2>/dev/null || echo 4)
-API=$DXG_MIN_SDK
+API=$ENSO_MIN_SDK
 NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
 
 SDL_VER=3.4.18
@@ -96,7 +96,7 @@ cmake_build() { # name srcdir args...
     echo "== $name ($ABI)"
     rm -rf "$bdir"
     cmake -S "$src" -B "$bdir" -G Ninja -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_TOOLCHAIN_FILE="$DXG_NDK_TOOLCHAIN" -DANDROID_ABI="$ABI" \
+        -DCMAKE_TOOLCHAIN_FILE="$ENSO_NDK_TOOLCHAIN" -DANDROID_ABI="$ABI" \
         -DANDROID_PLATFORM="android-$API" -DANDROID_STL=c++_static \
         -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON \
         -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_PREFIX_PATH="$PREFIX" \

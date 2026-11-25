@@ -2,13 +2,13 @@
 # Cross-builds the core/ unit tests (ensoradio_test) with the NDK, pushes
 # them and testdata/ to a device, and runs them there.
 #   tools/android_test.sh [serial]
-# serial: an adb serial (default: the headless emulator, emulator-$DXG_EMU_PORT).
+# serial: an adb serial (default: the headless emulator, emulator-$ENSO_EMU_PORT).
 # The ABI is read from the device. zlib comes from tools/build_android_deps.sh.
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 . "$ROOT/tools/android_env.sh"
-SERIAL=${1:-emulator-$DXG_EMU_PORT}
-DEV_DIR=/data/local/tmp/dxg
+SERIAL=${1:-emulator-$ENSO_EMU_PORT}
+DEV_DIR=/data/local/tmp/ensoradio
 
 ABI=$(adb -s "$SERIAL" shell getprop ro.product.cpu.abi | tr -d '\r')
 case $ABI in
@@ -19,11 +19,11 @@ TPA="$ROOT/third_party/android/$ABI"
 [ -f "$TPA/lib/libz.a" ] || { echo "run tools/build_android_deps.sh $ABI first" >&2; exit 1; }
 
 B="$ROOT/build-android-test-$ABI"
-cmake -S "$ROOT" -B "$B" -G Ninja -DCMAKE_BUILD_TYPE=Debug -DDXG_APP=OFF \
-    -DCMAKE_TOOLCHAIN_FILE="$DXG_NDK_TOOLCHAIN" -DANDROID_ABI="$ABI" \
-    -DANDROID_PLATFORM="android-$DXG_MIN_SDK" \
+cmake -S "$ROOT" -B "$B" -G Ninja -DCMAKE_BUILD_TYPE=Debug -DENSO_APP=OFF \
+    -DCMAKE_TOOLCHAIN_FILE="$ENSO_NDK_TOOLCHAIN" -DANDROID_ABI="$ABI" \
+    -DANDROID_PLATFORM="android-$ENSO_MIN_SDK" \
     -DZLIB_INCLUDE_DIR="$TPA/include" -DZLIB_LIBRARY="$TPA/lib/libz.a" \
-    -DDXG_TESTDATA_DIR="$DEV_DIR/testdata" >/dev/null
+    -DENSO_TESTDATA_DIR="$DEV_DIR/testdata" >/dev/null
 cmake --build "$B" --target ensoradio_test
 
 adb -s "$SERIAL" shell "rm -rf $DEV_DIR && mkdir -p $DEV_DIR/tmp"

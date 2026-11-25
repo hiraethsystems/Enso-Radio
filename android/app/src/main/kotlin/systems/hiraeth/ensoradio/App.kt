@@ -158,7 +158,7 @@ class Sheet {
 private val labelShadow = Shadow(Color(0xE0000000), Offset(0f, 2f), 8f)
 
 @Composable
-fun DxgApp() {
+fun EnsoApp() {
     val scope = rememberCoroutineScope()
     val sheet = remember { Sheet() }
     var backProgress by remember { mutableFloatStateOf(0f) }

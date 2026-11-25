@@ -9,12 +9,12 @@ plugins {
 // android/VERSION (MAJOR.MINOR.PATCH) and android/BUILD (goes up by one for
 // every build) are the only place the version is written down.
 fun readLine1(name: String): String = File(rootDir, name).readText().trim().lines().first().trim()
-val dxgVersion = readLine1("VERSION")
-val dxgBuild = readLine1("BUILD")
-require(Regex("^([0-9]|[1-9][0-9])\\.[0-9]\\.[0-9]$").matches(dxgVersion)) {
-    "android/VERSION must be MAJOR.MINOR.PATCH with minor and patch 0-9: '$dxgVersion'"
+val ensoVersion = readLine1("VERSION")
+val ensoBuild = readLine1("BUILD")
+require(Regex("^([0-9]|[1-9][0-9])\\.[0-9]\\.[0-9]$").matches(ensoVersion)) {
+    "android/VERSION must be MAJOR.MINOR.PATCH with minor and patch 0-9: '$ensoVersion'"
 }
-require(Regex("^[1-9][0-9]*$").matches(dxgBuild)) { "android/BUILD must be a whole number: '$dxgBuild'" }
+require(Regex("^[1-9][0-9]*$").matches(ensoBuild)) { "android/BUILD must be a whole number: '$ensoBuild'" }
 
 // The globe imagery is built by tools/make_earth.py into build-earth/ (not in
 // git: 360 MB). The APK isn't worth having without it, so stop with the
@@ -34,14 +34,14 @@ for (pack in listOf("earth-day.pack", "earth-night.pack")) {
 // committed (tools/make_release_key.sh makes it). Without it, the release
 // APK is built unsigned.
 val signingFile = File(
-    System.getenv("DXG_SIGNING_PROPERTIES")
-        ?: (System.getProperty("user.home") + "/.config/dxgarden/signing.properties")
+    System.getenv("ENSO_SIGNING_PROPERTIES")
+        ?: (System.getProperty("user.home") + "/.config/ensoradio/signing.properties")
 )
 val signingProps: Properties? = if (signingFile.isFile) Properties().apply { signingFile.inputStream().use { load(it) } } else null
 
 // APK name: ensoradio-<version>-b<build>-<buildtype>.apk
 base {
-    archivesName.set("ensoradio-$dxgVersion-b$dxgBuild")
+    archivesName.set("ensoradio-$ensoVersion-b$ensoBuild")
 }
 
 android {
@@ -53,16 +53,16 @@ android {
         applicationId = "systems.hiraeth.ensoradio"
         minSdk = 33
         targetSdk = 36
-        versionCode = dxgBuild.toInt()
-        versionName = dxgVersion
+        versionCode = ensoBuild.toInt()
+        versionName = ensoVersion
 
         externalNativeBuild {
             cmake {
                 arguments += listOf(
                     "-DANDROID_STL=c++_static",
                     "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
-                    "-DDXG_VERSION=$dxgVersion",
-                    "-DDXG_BUILD=$dxgBuild",
+                    "-DENSO_VERSION=$ensoVersion",
+                    "-DENSO_BUILD=$ensoBuild",
                 )
             }
         }
