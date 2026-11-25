@@ -1,4 +1,5 @@
 import java.io.File
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -29,6 +30,15 @@ for (pack in listOf("earth-day.pack", "earth-night.pack")) {
     }
 }
 
+// Release signing: Aisling's own key, kept outside the repository and never
+// committed (tools/make_release_key.sh makes it). Without it, the release
+// APK is built unsigned.
+val signingFile = File(
+    System.getenv("DXG_SIGNING_PROPERTIES")
+        ?: (System.getProperty("user.home") + "/.config/dxgarden/signing.properties")
+)
+val signingProps: Properties? = if (signingFile.isFile) Properties().apply { signingFile.inputStream().use { load(it) } } else null
+
 // APK name: dxgarden-<version>-b<build>-<buildtype>.apk
 base {
     archivesName.set("dxgarden-$dxgVersion-b$dxgBuild")
@@ -58,6 +68,18 @@ android {
         }
     }
 
+    signingConfigs {
+        if (signingProps != null) {
+            create("release") {
+                storeFile = File(signingProps.getProperty("storeFile"))
+                storePassword = signingProps.getProperty("storePassword")
+                keyAlias = signingProps.getProperty("keyAlias")
+                keyPassword = signingProps.getProperty("keyPassword")
+                storeType = "PKCS12"
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // The emulator is x86_64; the phone and releases are arm64-v8a.
@@ -65,6 +87,7 @@ android {
         }
         release {
             ndk { abiFilters += listOf("arm64-v8a") }
+            if (signingProps != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

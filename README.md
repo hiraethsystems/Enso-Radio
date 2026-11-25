@@ -1,9 +1,16 @@
 # DX Garden for Android
 
-**Work in progress: there is no release yet.** This is the Android port of
-DX Garden, a radio player and explorer in the spirit of spinning a globe and
-listening to what's on air somewhere else. Turn the globe, hold the
-crosshair on a place, and hear its stations.
+DX Garden is a radio explorer: spin the globe, hold the ring over a place,
+and hear what's on air there. It's a player for internet radio streams, with
+a station list that is yours to keep and edit.
+
+<p align="center"><img src="docs/screenshot-android.png" width="300"
+alt="DX Garden on a phone: a satellite view of Ireland and Britain dotted with
+stations, the ring over Dublin playing 8Radio, and the mini player below"></p>
+
+**0.9.0 is a beta.** So far it has been tested on a Samsung Galaxy S25 Ultra
+(Android 17) and the Android emulator. Please report problems as GitHub
+issues.
 
 DX Garden started on the PS Vita
 ([hiraethsystems/DX-Garden](https://github.com/hiraethsystems/DX-Garden),
@@ -13,21 +20,61 @@ This repository was split from the Linux one with its history, and keeps the
 shared portable C code in `core/`. The apps share a station-file format but
 are developed and released separately.
 
-## Plans
+## What it does
 
-- Android 13 or later, phones, tablets and foldables.
-- A player and explorer for streams. It will ship a dated snapshot of
+- A globe from NASA's satellite imagery, with a moving day and night side and
+  city lights at night. Drag to spin it, pinch or double-tap to zoom.
+- Hold a place under the ring and it plays. Search for stations and places,
+  browse by country or genre, keep favourites, and go back to recent
+  stations.
+- Plays MP3, AAC and HE-AAC, Ogg Vorbis, Opus and FLAC, and HLS streams.
+  Shows the song playing when the station sends it.
+- Keeps playing in the background and with the screen off, with controls in
+  the notification, on the lock screen, and on headphones and Bluetooth.
+  Pauses for phone calls. A sleep timer is in Now Playing.
+- About 51,000 stations included: a snapshot of
   [Radio Browser](https://www.radio-browser.info), a community station
-  directory, as a default list that is yours to edit and keep up to date.
-  The app downloads a fresh list only when you ask it to, never by itself.
-- Released here on GitHub (APK) and on F-Droid. No Google Play, no Google
-  Play Services, no analytics.
-- Your files (`stations.txt`, favourites, M3U/PLS imports) will live in
-  `Android/data/systems.hiraeth.dxgarden/files/`, which you can reach from a
-  computer over USB. Android deletes that folder when the app is
-  uninstalled, so copy your files off first.
+  directory, from 22 November 2026. Stations change address and close, so
+  keeping your list up to date is up to you. The app never downloads
+  anything you didn't ask for.
+- No Google Play Services, no analytics, no ads, no account.
+
+## Installing
+
+Download the APK from [Releases](https://github.com/hiraethsystems/DX-Garden-Android/releases)
+and open it on your phone (Android asks you to allow your browser or file
+manager to install apps). It needs **Android 13 or later** on a 64-bit ARM
+phone or tablet, which is nearly all of them since 2019.
+
+The APK is about 390 MB, almost all of it the globe's imagery, which is kept
+at full detail.
+
+## Your files
+
+Your station list (`stations.txt`), favourites and recent stations are in
+`Android/data/systems.hiraeth.dxgarden/files/` on the phone's storage, where
+a computer can reach them over USB. The app copies its included list there
+the first time it starts and never overwrites it afterwards, so your edits
+are kept. Android deletes that folder when the app is uninstalled, so copy
+your files off first.
+
+## Not yet
+
+- Adding a station by its address, opening M3U and PLS playlists with DX
+  Garden, and Download Station List (a fresh list from Radio Browser, when
+  you ask). For now, edit `stations.txt` from a computer.
+- F-Droid. Releases are here on GitHub for now.
 
 Progress and design decisions are in `NOTES.md`.
+
+## Building
+
+Everything builds from the command line on Linux, without Android Studio:
+the Android SDK command-line tools, NDK 28.2.13676358, the Gradle wrapper and
+JDK 21. `NOTES.md` (A0) has the exact versions, and the "Building" section of
+the Android notes has the steps. The globe imagery is made by
+`tools/make_earth.py` and the native libraries by
+`tools/build_android_deps.sh`.
 
 ## Tests
 
@@ -50,6 +97,8 @@ python3 -I tools/test_rb_to_stations.py
   libogg, libvorbis, Opus, opusfile and libFLAC (BSD), FreeType (FreeType
   licence), HarfBuzz (MIT), FriBidi (LGPL 2.1), zlib (zlib licence) and
   stb_image (public domain or MIT).
+- The interface uses Jetpack Compose and Material 3 (AndroidX, Apache 2.0),
+  and a few of Google's Material Icons (Apache 2.0).
 - Unicode tables made from the Unicode Character Database (Unicode
   licence).
 - Fonts: Liberation Sans, and Noto Sans, Noto Sans Arabic, Hebrew, Thai,
