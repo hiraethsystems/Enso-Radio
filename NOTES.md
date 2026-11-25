@@ -3115,3 +3115,54 @@ here).
 - Checked on the emulator: the round launcher icon and the media
   notification's small icon. Not yet checked: themed icons and Samsung's
   squircle mask on the phone.
+
+## A smaller APK: full detail as a download, R8, build 23 (2026-11-25)
+
+- **Owner's decision (2026-11-25):** the APK shouldn't be 390 MB. The
+  closest zoom level of the globe (level 6, 254 MB of the 359 MB of
+  imagery) is now an optional download; the APK keeps levels 0-5. With R8
+  the release APK is **117 MB** (was 392 MB).
+- **Measured first** (24 tiles a layer from NASA's originals, equal SSIM):
+  WebP would save only 10-15 % (day) and less for night once PSNR is
+  matched, for a new library; not done. Progressive JPEG is 3-5 % smaller
+  with identical pixels, but stb_image decodes it 2.7 times slower (3.2 ms
+  against 1.2 ms a tile on Saoirse); not done. AVIF wasn't tested (new
+  tools and two libraries).
+- **Imagery:** `tools/make_earth.py --detail-from 6` writes levels 0-5 to
+  `build-earth/` (in the APK: day 72 MB, night 33 MB) and level 6 to
+  `build-earth-detail/` (day 169 MB, night 85 MB). Rebuilt from the NASA
+  sources, all four files are byte-for-byte the same as the earlier packs
+  split, so F-Droid can rebuild them and get the files the app checks for.
+- **Native:** a layer reads up to two packs (`earth_set_detail`): the
+  APK's, and the detail pack once it's in `globe/` in the files folder.
+  Adding or dropping it pauses the loader threads, rereads the indexes and
+  restarts them, so a finished download shows at once (CMD_GLOBE_DETAIL),
+  and at start-up when it's there.
+- **Download** (`GlobeDetail.kt`, Settings > Globe > Full detail): only
+  when the user asks; from the GitHub release `globe-1` of this repository
+  (`earth-day-detail.pack`, `earth-night-detail.pack`). Each file goes to a
+  `.part` file and carries on with an HTTP Range request after a stop or a
+  dropped connection; it's checked against the size and SHA-256 in
+  `GlobeDetail.kt` before it's renamed into place. Checks free space first;
+  holds a partial wake lock while it runs. Stop, Carry on, Delete and
+  Remove. Gradle refuses to build if `build-earth-detail/` doesn't match
+  the numbers in `GlobeDetail.kt`. New detail files mean a new release tag
+  (`globe-2`) and new numbers.
+- Debug builds take `--es globe_url http://10.0.2.2:PORT/` to download
+  from a test server on the PC, and allow plain HTTP to 10.0.2.2 only
+  (`src/debug/`).
+- **R8** is on for release (`isMinifyEnabled`, `isShrinkResources`); the dex
+  goes from 21.3 MB to 2.1 MB. `proguard-rules.pro` keeps SDL's Java classes
+  and ours whole, since libmain calls them by name. The `r8test` build type
+  is the release build for the emulator, signed with the debug key.
+- **Checked on the emulator:** the download from a local server that cut
+  each file off at 60 MB: an error with Carry on, then a Range resume from
+  60 MB, both files checked and saved, the globe at levels 0-6 at once;
+  sharper at 25 km over the Alps than without; detail loaded again after a
+  restart; Remove deletes the files and the globe goes back to levels 0-5.
+  The `r8test` build starts, plays, takes media keys, opens About and
+  Settings. Release APK signed with the 0.9.0 certificate, 16 KB aligned.
+- **Not yet:** the real download from GitHub (the `globe-1` release isn't
+  published yet); a download on mobile data or with the app in the
+  background for long (a long download may stop if Android stops the app;
+  Carry on resumes it); the release build on the phone.

@@ -15,7 +15,8 @@ enum {
     CMD_PREVIOUS,
     CMD_PLAY_STATION = 10, /* arg: station index */
     CMD_SHOW_PLACE,        /* arg: place index; turns there and plays it */
-    CMD_PREBUFFER          /* arg: KB before playing starts */
+    CMD_PREBUFFER,         /* arg: KB before playing starts */
+    CMD_GLOBE_DETAIL       /* the full-detail packs were downloaded or removed */
 };
 
 /* The library, or NULL until it has loaded. */

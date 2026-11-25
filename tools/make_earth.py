@@ -12,6 +12,10 @@ north-west corner at 180 W, 90 N. Levels 0-6 go up to 65536 x 32768 px for
 the whole Earth, about 600 m per pixel at the equator (--max-level 5 gives
 the Linux app's 32768 px pack).
 
+With --detail-from N (Android: 6), levels N and up go to a second pack,
+earth-day-detail.pack, in a folder beside --out (OUT-detail): the app ships the first and downloads the second
+only when the user asks for full detail. Without it, one pack as before.
+
 Pack format (little-endian): tile data, then an index of
 (level u8, pad u8, x u16, y u16, pad u16, offset u64, size u32) per tile,
 then a footer: index offset u64, tile count u32, b"ENSO", version u32.
@@ -104,6 +108,8 @@ class Pack:
 
     def add(self, level, x, y, img):
         buf = io.BytesIO()
+        # Baseline, not progressive: progressive is 3-5 % smaller with the
+        # same pixels, but stb_image decodes it about 2.7 times slower.
         img.save(buf, "JPEG", quality=QUALITY, optimize=True, progressive=False)
         data = buf.getvalue()
         self.index.append((level, x, y, self.f.tell(), len(data)))
@@ -133,6 +139,8 @@ def main():
     ap.add_argument("--layer", choices=sorted(LAYERS), default="day")
     ap.add_argument("--max-level", type=int, default=MAX_LEVEL,
                     help="top level, 1-6 (default %d)" % MAX_LEVEL)
+    ap.add_argument("--detail-from", type=int, default=0,
+                    help="put levels from this one up in a separate -detail pack (0: no split)")
     args = ap.parse_args()
     top = args.max_level
     if not 1 <= top <= 6:
@@ -143,6 +151,12 @@ def main():
     layer = LAYERS[args.layer]
     paths = {p: fetch(args.cache, layer, p) for p in PIECES}
     pack = Pack(os.path.join(args.out, layer["out"]))
+    detail = None
+    if args.detail_from:
+        # Beside --out, not in it: everything in --out goes into the APK.
+        ddir = args.out.rstrip("/") + "-detail"
+        os.makedirs(ddir, exist_ok=True)
+        detail = Pack(os.path.join(ddir, layer["out"].replace(".pack", "-detail.pack")))
 
     # Each piece is 90 x 90 degrees: a quarter of the width and half the
     # height. At level L it is 2^(L-1) tiles square, so levels 1 to top are
@@ -166,15 +180,18 @@ def main():
         while level >= 1:
             side = TILE << (level - 1)
             img = img.resize((side, side), Image.LANCZOS)
-            cut(pack, level, img, col * (side // TILE), row * (side // TILE))
+            dest = detail if detail and level >= args.detail_from else pack
+            cut(dest, level, img, col * (side // TILE), row * (side // TILE))
             level -= 1
         level0.paste(img.resize((TILE // 2, TILE // 2), Image.LANCZOS),
                      (col * TILE // 2, row * TILE // 2))
         del img
     cut(pack, 0, level0, 0, 0)
-    pack.close()
-    print("wrote %s: %d tiles, %.1f MB" % (pack.f.name, len(pack.index),
-                                          os.path.getsize(pack.f.name) / 1e6))
+    for p in (pack, detail):
+        if p:
+            p.close()
+            print("wrote %s: %d tiles, %.1f MB" % (p.f.name, len(p.index),
+                                                  os.path.getsize(p.f.name) / 1e6))
 
 
 if __name__ == "__main__":

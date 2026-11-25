@@ -53,6 +53,10 @@ class MainActivity : SDLActivity(), LifecycleOwner, SavedStateRegistryOwner, Vie
         backDispatcher.setOnBackInvokedDispatcher(onBackInvokedDispatcher)
         Prefs.init(this)
         Playback.init(this)
+        GlobeDetail.init(this)
+        if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            intent?.getStringExtra("globe_url")?.let { GlobeDetail.overrideBaseUrl(it) }
+        }
         val info = packageManager.getPackageInfo(packageName, 0)
         AppInfo.version = info.versionName ?: ""
         AppInfo.build = info.longVersionCode.toInt()

@@ -138,12 +138,19 @@ typedef struct {
     uint32_t key;
     uint64_t off;
     uint32_t size;
+    int src; /* which of the layer's files: 0 the APK's, 1 the detail pack */
 } pack_entry;
 
+/* A layer's tiles come from up to two files: the pack in the APK (levels
+ * 0-5) and, once the user has downloaded full detail, a detail pack
+ * (level 6) in the app's files folder. */
+enum { PACK_SRCS = 2 };
+
 typedef struct {
-    char path[1100];
+    char path[PACK_SRCS][1100];
+    int n_src;
     pack_entry *entries;
-    int n_entries, max_level;
+    int n_entries, n_base, max_level;
     int32_t *table; /* open addressing: index into entries, -1 empty */
     uint32_t table_mask;
 } pack;
@@ -181,18 +188,42 @@ static int find_entry(uint32_t key)
     return -1;
 }
 
-/* Opens a pack: a file path, or on Android an asset name (SDL reads APK
- * assets through the same call; the packs are stored uncompressed, so
- * seeking is cheap). */
+static void rebuild_table(pack *p)
+{
+    uint32_t cap = 1;
+    int i;
+    free(p->table);
+    while (cap < (uint32_t)p->n_entries * 2)
+        cap <<= 1;
+    p->table = malloc(sizeof(int32_t) * cap);
+    p->table_mask = cap - 1;
+    p->max_level = -1;
+    if (!p->table)
+        return;
+    memset(p->table, 0xFF, sizeof(int32_t) * cap);
+    for (i = 0; i < p->n_entries; i++) {
+        uint32_t h = (p->entries[i].key * 2654435761u) & p->table_mask;
+        while (p->table[h] >= 0)
+            h = (h + 1) & p->table_mask;
+        p->table[h] = (int32_t)i;
+        if (key_level(p->entries[i].key) > p->max_level)
+            p->max_level = key_level(p->entries[i].key);
+    }
+}
+
+/* Adds a pack file's tiles to a layer: a file path, or on Android an
+ * asset name (SDL reads APK assets through the same call; the packs are
+ * stored uncompressed, so seeking is cheap). Returns 0 if it was read. */
 static int open_pack(int layer, const char *path)
 {
     pack *p = &packs[layer];
-    SDL_IOStream *f = SDL_IOFromFile(path, "rb");
+    SDL_IOStream *f;
     unsigned char foot[20];
     uint64_t at;
-    uint32_t n, i, cap = 1;
-    p->max_level = -1;
-    if (!f)
+    uint32_t n, i;
+    pack_entry *grown;
+    int src = p->n_src;
+    if (src >= PACK_SRCS || !(f = SDL_IOFromFile(path, "rb")))
         return -1;
     if (SDL_SeekIO(f, -20, SDL_IO_SEEK_END) < 0 || SDL_ReadIO(f, foot, 20) != 20 ||
         memcmp(foot + 12, "ENSO", 4) != 0) {
@@ -201,38 +232,41 @@ static int open_pack(int layer, const char *path)
     }
     memcpy(&at, foot, 8);
     memcpy(&n, foot + 8, 4);
-    p->entries = calloc(n ? n : 1, sizeof(*p->entries));
-    while (cap < n * 2)
-        cap <<= 1;
-    p->table = malloc(sizeof(int32_t) * cap);
-    if (!p->entries || !p->table || SDL_SeekIO(f, (Sint64)at, SDL_IO_SEEK_SET) < 0) {
+    grown = realloc(p->entries, sizeof(*p->entries) * ((size_t)p->n_entries + n + 1));
+    if (!grown || SDL_SeekIO(f, (Sint64)at, SDL_IO_SEEK_SET) < 0) {
+        if (grown)
+            p->entries = grown;
         SDL_CloseIO(f);
         return -1;
     }
-    memset(p->table, 0xFF, sizeof(int32_t) * cap);
-    p->table_mask = cap - 1;
+    p->entries = grown;
     for (i = 0; i < n; i++) {
         unsigned char e[20];
         uint16_t x, y;
-        uint32_t h;
+        pack_entry *pe = &p->entries[p->n_entries];
         if (SDL_ReadIO(f, e, 20) != 20)
             break;
         memcpy(&x, e + 2, 2);
         memcpy(&y, e + 4, 2);
-        p->entries[i].key = tkey(layer, e[0], x, y);
-        memcpy(&p->entries[i].off, e + 8, 8);
-        memcpy(&p->entries[i].size, e + 16, 4);
-        if (e[0] > p->max_level)
-            p->max_level = e[0];
-        h = (p->entries[i].key * 2654435761u) & p->table_mask;
-        while (p->table[h] >= 0)
-            h = (h + 1) & p->table_mask;
-        p->table[h] = (int32_t)i;
+        pe->key = tkey(layer, e[0], x, y);
+        memcpy(&pe->off, e + 8, 8);
+        memcpy(&pe->size, e + 16, 4);
+        pe->src = src;
+        if (find_entry(pe->key) >= 0)
+            continue; /* the first file's copy wins */
+        p->n_entries++;
     }
-    p->n_entries = (int)i;
     SDL_CloseIO(f);
-    snprintf(p->path, sizeof(p->path), "%s", path);
+    snprintf(p->path[src], sizeof(p->path[src]), "%s", path);
+    p->n_src++;
+    rebuild_table(p);
     return 0;
+}
+
+static void update_max_level(void)
+{
+    max_level = packs[LAYER_DAY].max_level > packs[LAYER_NIGHT].max_level
+                    ? packs[LAYER_DAY].max_level : packs[LAYER_NIGHT].max_level;
 }
 
 /* ---- tile cache and loaders ---- */
@@ -271,11 +305,12 @@ static int quitting;
 
 static int SDLCALL worker(void *ud)
 {
-    SDL_IOStream *f[LAYERS];
-    int l;
+    SDL_IOStream *f[LAYERS][PACK_SRCS];
+    int l, k;
     (void)ud;
     for (l = 0; l < LAYERS; l++)
-        f[l] = packs[l].entries ? SDL_IOFromFile(packs[l].path, "rb") : NULL;
+        for (k = 0; k < PACK_SRCS; k++)
+            f[l][k] = k < packs[l].n_src ? SDL_IOFromFile(packs[l].path[k], "rb") : NULL;
     for (;;) {
         uint32_t key;
         int e, w = 0, h = 0, comp;
@@ -293,8 +328,8 @@ static int SDLCALL worker(void *ud)
         SDL_UnlockMutex(qlock);
 
         e = find_entry(key);
-        io = f[key_layer(key)];
-        if (io && e >= 0) {
+        io = e >= 0 ? f[key_layer(key)][packs[key_layer(key)].entries[e].src] : NULL;
+        if (io) {
             const pack_entry *pe = &packs[key_layer(key)].entries[e];
             if ((buf = malloc(pe->size)) != NULL &&
                 SDL_SeekIO(io, (Sint64)pe->off, SDL_IO_SEEK_SET) >= 0 &&
@@ -312,8 +347,9 @@ static int SDLCALL worker(void *ud)
         SDL_UnlockMutex(qlock);
     }
     for (l = 0; l < LAYERS; l++)
-        if (f[l])
-            SDL_CloseIO(f[l]);
+        for (k = 0; k < PACK_SRCS; k++)
+            if (f[l][k])
+                SDL_CloseIO(f[l][k]);
     return 0;
 }
 
@@ -768,9 +804,9 @@ int earth_init(const char *day_path, const char *night_path)
         else
             LOG("globe: %s imagery, %d tiles, levels 0-%d", l ? "night" : "day",
                 packs[l].n_entries, packs[l].max_level);
+        packs[l].n_base = packs[l].n_entries;
     }
-    max_level = packs[LAYER_DAY].max_level > packs[LAYER_NIGHT].max_level
-                    ? packs[LAYER_DAY].max_level : packs[LAYER_NIGHT].max_level;
+    update_max_level();
     if (!packs[LAYER_DAY].entries && !packs[LAYER_NIGHT].entries)
         return 0; /* plain globe */
     qlock = SDL_CreateMutex();
@@ -778,6 +814,53 @@ int earth_init(const char *day_path, const char *night_path)
     for (i = 0; i < WORKERS; i++)
         workers[i] = SDL_CreateThread(worker, "enso_tiles", NULL);
     return 0;
+}
+
+static void start_workers(void)
+{
+    int i;
+    quitting = 0;
+    for (i = 0; i < WORKERS; i++)
+        workers[i] = SDL_CreateThread(worker, "enso_tiles", NULL);
+}
+
+static void stop_workers(void)
+{
+    int i;
+    SDL_LockMutex(qlock);
+    quitting = 1;
+    SDL_BroadcastCondition(qcond);
+    SDL_UnlockMutex(qlock);
+    for (i = 0; i < WORKERS; i++)
+        if (workers[i])
+            SDL_WaitThread(workers[i], NULL);
+    memset(workers, 0, sizeof(workers));
+}
+
+void earth_set_detail(const char *day_path, const char *night_path)
+{
+    const char *paths[LAYERS];
+    int l;
+    if (!qlock)
+        return; /* plain globe: no APK packs to add to */
+    stop_workers();
+    paths[LAYER_DAY] = day_path;
+    paths[LAYER_NIGHT] = night_path;
+    for (l = 0; l < LAYERS; l++) {
+        pack *p = &packs[l];
+        p->n_entries = p->n_base; /* drop any detail pack opened before */
+        p->n_src = p->n_base ? 1 : 0;
+        rebuild_table(p);
+        if (p->n_src && paths[l] && SDL_GetPathInfo(paths[l], NULL)) {
+            if (open_pack(l, paths[l]) == 0)
+                LOG("globe: %s detail, %d tiles, now levels 0-%d", l ? "night" : "day",
+                    p->n_entries - p->n_base, p->max_level);
+            else
+                LOG("globe: could not read %s", paths[l]);
+        }
+    }
+    update_max_level();
+    start_workers();
 }
 
 void earth_gl_reset(void)

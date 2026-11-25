@@ -28,6 +28,10 @@ int earth_init(const char *day_pack, const char *night_pack);
  * SDL_EVENT_RENDER_DEVICE_RESET): rebuilds every GL object in the new
  * context. Tiles reload as they are drawn. */
 void earth_gl_reset(void);
+/* Adds the full-detail packs (file paths; a missing one is skipped), or
+ * drops the ones added before when both are NULL or gone. Pauses the
+ * loader threads while it reads the packs' indexes. */
+void earth_set_detail(const char *day_pack, const char *night_pack);
 /* Frees the GPU's copies of every tile but the coarsest (levels 0-2), for
  * when the app goes to the background. They reload as they are drawn. */
 void earth_trim(void);
