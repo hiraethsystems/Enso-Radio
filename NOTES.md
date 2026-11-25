@@ -3097,3 +3097,21 @@ here).
   0.9.0 release keeps its file name and checksum so downloads and
   verification still work.
 - Builds 20 and 21.
+
+## New icon, build 22 (2026-11-25)
+
+- **Owner's decision (2026-11-25):** a new icon for every platform: a
+  brush-drawn ensō around a radio mast, white on black. The artwork is the
+  owner's (made with Gemini), kept as `art/icon-source.jpg` (1024 px JPEG).
+- `tools/icon_extract.py` cuts the white brush art out of the black square
+  (alpha from brightness, so the brush's soft edges stay; JPEG noise in
+  the black is dropped), and `tools/make_icons.py` makes every platform's
+  files from it, so the Linux and Vita icons are the same art.
+- **Android:** adaptive icon with the art alone as the foreground (60 dp of
+  108, inside the 66 dp circle every launcher mask keeps) on the artwork's
+  black (`#0D0D0D`); the same art is the monochrome layer for themed icons
+  and the notification's small icon (`drawable-nodpi`, 96 px). The old
+  globe picture and vector drawings are gone.
+- Checked on the emulator: the round launcher icon and the media
+  notification's small icon. Not yet checked: themed icons and Samsung's
+  squircle mask on the phone.

@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ensō Radio's icon: the Linux and Vita app's globe picture
-     (linux/share/systems.hiraeth.ensoradio.png in Enso-Radio-Linux, drawn from
-     the app's own Natural Earth map), on its rim colour. The monochrome
-     layer, for themed icons, is a line drawing of the same idea. -->
+<!-- Ensō Radio's icon: a brush-drawn ensō around a radio mast, white on
+     black (the same artwork as the Linux and Vita icons). The foreground and
+     the monochrome layer, for themed icons, are the brush art alone. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
