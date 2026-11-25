@@ -33,7 +33,7 @@ if [ $# -eq 0 ]; then
         "PLS playlist|https://somafm.com/groovesalad.pls"
 fi
 
-PKG=systems.hiraeth.dxgarden
+PKG=systems.hiraeth.ensoradio
 VERSION=$(cat "$ROOT/android/VERSION")
 BUILD=$(cat "$ROOT/android/BUILD")
 LOG=/storage/emulated/0/Android/data/$PKG/files/log-$VERSION-b$BUILD.txt

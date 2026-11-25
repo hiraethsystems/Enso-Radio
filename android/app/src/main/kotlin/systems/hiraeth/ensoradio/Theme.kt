@@ -1,4 +1,4 @@
-package systems.hiraeth.dxgarden
+package systems.hiraeth.ensoradio
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 /*
- * DX Garden's own colours: night-sky blues with the amber of the place
+ * Ensō Radio's own colours: night-sky blues with the amber of the place
  * dots (earth.c) as the accent, and a sea-green second colour. Or the
  * phone's Material You colours, if chosen in Settings.
  */

@@ -1,4 +1,4 @@
-package systems.hiraeth.dxgarden
+package systems.hiraeth.ensoradio
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -48,7 +48,7 @@ object Playback {
     const val NOTIFICATION_ID = 1
     private const val CHANNEL = "playback"
     private const val ACTION_STOP = "stop"
-    private const val TAG = "DXGarden"
+    private const val TAG = "EnsoRadio"
 
     /** Implemented in libmain (main.c): queues a command for the native loop. */
     @JvmStatic
@@ -140,12 +140,12 @@ object Playback {
             .setOnAudioFocusChangeListener(focusListener, main)
             .build()
         wifiLock = app.getSystemService(WifiManager::class.java)
-            ?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "DXGarden:stream")
+            ?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "EnsoRadio:stream")
             ?.apply { setReferenceCounted(false) }
         wakeLock = app.getSystemService(PowerManager::class.java)
-            ?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DXGarden:stream")
+            ?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "EnsoRadio:stream")
             ?.apply { setReferenceCounted(false) }
-        session = MediaSession(app, "DXGarden").apply {
+        session = MediaSession(app, "EnsoRadio").apply {
             setCallback(object : MediaSession.Callback() {
                 override fun onPlay() = command(CMD_PLAY)
                 override fun onPause() = command(CMD_PAUSE)

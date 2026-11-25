@@ -74,12 +74,12 @@ void log_printf(const char *fmt, ...)
         fwrite(line, 1, (size_t)n, stderr);
     SDL_UnlockMutex(log_lock);
 #ifdef __ANDROID__
-    /* Every line to logcat too (tag DXGarden), without our timestamp:
+    /* Every line to logcat too (tag EnsoRadio), without our timestamp:
      * logcat has its own. */
     line[n - 1] = '\0';
     {
         const char *msg = strchr(line, ']');
-        __android_log_write(ANDROID_LOG_INFO, "DXGarden", msg ? msg + 2 : line);
+        __android_log_write(ANDROID_LOG_INFO, "EnsoRadio", msg ? msg + 2 : line);
     }
 #endif
 }

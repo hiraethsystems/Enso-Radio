@@ -1,7 +1,7 @@
 # The native app, libmain.so, built by Gradle (android/app/build.gradle.kts)
 # for each ABI. Libraries come from tools/build_android_deps.sh.
 cmake_minimum_required(VERSION 3.22)
-project(dxgarden_native C CXX)
+project(ensoradio_native C CXX)
 
 get_filename_component(DXG_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 set(DXG_TP "${DXG_ROOT}/third_party/android/${ANDROID_ABI}")

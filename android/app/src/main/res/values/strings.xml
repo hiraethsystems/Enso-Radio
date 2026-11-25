@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">DX Garden</string>
+    <string name="app_name">Ensō Radio</string>
     <string name="channel_playback">Playback</string>
     <string name="channel_playback_about">The station playing, with controls</string>
     <string name="stop">Stop</string>

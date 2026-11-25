@@ -1,4 +1,4 @@
-package systems.hiraeth.dxgarden
+package systems.hiraeth.ensoradio
 
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Color

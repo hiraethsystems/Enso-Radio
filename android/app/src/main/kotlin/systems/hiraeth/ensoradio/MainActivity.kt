@@ -1,4 +1,4 @@
-package systems.hiraeth.dxgarden
+package systems.hiraeth.ensoradio
 
 import android.content.pm.ApplicationInfo
 import android.os.Bundle
@@ -22,7 +22,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import org.libsdl.app.SDLActivity
 
 /**
- * DX Garden's activity: SDL's activity (the globe, drawn in native code, with
+ * Ensō Radio's activity: SDL's activity (the globe, drawn in native code, with
  * SDL linked statically into libmain.so), with the Compose interface over it.
  *
  * SDL's activity is a plain Activity, so this class provides what Compose
@@ -147,7 +147,7 @@ class MainActivity : SDLActivity(), LifecycleOwner, SavedStateRegistryOwner, Vie
     /**
      * The Linux app's test options, passed as intent extras for headless
      * checks over adb, e.g.
-     *   adb shell am start -n systems.hiraeth.dxgarden/.MainActivity \
+     *   adb shell am start -n systems.hiraeth.ensoradio/.MainActivity \
      *       -e play https://example/stream -e seconds 20
      * Only in debuggable builds, so other apps can't drive a release build.
      */

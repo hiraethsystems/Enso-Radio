@@ -39,18 +39,18 @@ val signingFile = File(
 )
 val signingProps: Properties? = if (signingFile.isFile) Properties().apply { signingFile.inputStream().use { load(it) } } else null
 
-// APK name: dxgarden-<version>-b<build>-<buildtype>.apk
+// APK name: ensoradio-<version>-b<build>-<buildtype>.apk
 base {
-    archivesName.set("dxgarden-$dxgVersion-b$dxgBuild")
+    archivesName.set("ensoradio-$dxgVersion-b$dxgBuild")
 }
 
 android {
-    namespace = "systems.hiraeth.dxgarden"
+    namespace = "systems.hiraeth.ensoradio"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "systems.hiraeth.dxgarden"
+        applicationId = "systems.hiraeth.ensoradio"
         minSdk = 33
         targetSdk = 36
         versionCode = dxgBuild.toInt()
