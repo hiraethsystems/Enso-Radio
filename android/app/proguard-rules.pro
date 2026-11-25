@@ -77,3 +77,9 @@
     void hapticRumble(int, float, float, int);
     void hapticStop(int);
 }
+
+# Ensō Radio. libmain calls into SDL's Java side and ours by name over JNI
+# (bridge.c, ui_jni.c), so keep both whole; R8 then shrinks the libraries
+# (Compose, Kotlin), which are most of the dex.
+-keep class org.libsdl.app.** { *; }
+-keep class systems.hiraeth.ensoradio.** { *; }

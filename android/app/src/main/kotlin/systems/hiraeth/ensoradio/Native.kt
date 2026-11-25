@@ -12,6 +12,7 @@ object Native {
     const val CMD_PLAY_STATION = 10
     const val CMD_SHOW_PLACE = 11
     const val CMD_PREBUFFER = 12
+    const val CMD_GLOBE_DETAIL = 13
 
     const val COUNTRIES = 0
     const val GENRES = 1

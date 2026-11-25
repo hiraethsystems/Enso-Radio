@@ -35,6 +35,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -329,6 +331,7 @@ fun SettingsPage() {
                 }
                 Switch(checked = Prefs.haptics, onCheckedChange = null)
             }
+            GlobeDetailSetting()
             SectionTitle("Your files")
             Text(
                 "Your station list (stations.txt), favourites and recent stations are in " +
@@ -339,6 +342,51 @@ fun SettingsPage() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(32.dp))
+        }
+    }
+}
+
+/** Settings > Globe: download, stop, carry on or remove full detail. */
+@Composable
+private fun GlobeDetailSetting() {
+    val st = GlobeDetail.state
+    val total = GlobeDetail.mb(GlobeDetail.TOTAL)
+    val have = GlobeDetail.mb(GlobeDetail.have)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Text("Full detail", style = MaterialTheme.typography.bodyLarge)
+        val text = when (st) {
+            GlobeDetail.State.ABSENT ->
+                "Sharper imagery when you zoom in close. A one-off download of $total from the app's GitHub page."
+            GlobeDetail.State.PARTIAL -> "$have of $total downloaded so far."
+            GlobeDetail.State.DOWNLOADING -> "Downloading: $have of $total. You can leave this page; keep Ensō Radio open."
+            GlobeDetail.State.CHECKING -> "Checking the download…"
+            GlobeDetail.State.INSTALLED -> "Installed ($total). The globe is at its sharpest when you zoom in close."
+            GlobeDetail.State.FAILED -> GlobeDetail.error ?: "The download stopped."
+        }
+        Text(
+            text, style = MaterialTheme.typography.bodyMedium,
+            color = if (st == GlobeDetail.State.FAILED) MaterialTheme.colorScheme.error
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (st == GlobeDetail.State.DOWNLOADING || st == GlobeDetail.State.CHECKING) {
+            LinearProgressIndicator(
+                progress = { (GlobeDetail.have.toFloat() / GlobeDetail.TOTAL).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            )
+        }
+        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            when (st) {
+                GlobeDetail.State.ABSENT -> Button(onClick = { GlobeDetail.start() }) { Text("Download") }
+                GlobeDetail.State.PARTIAL, GlobeDetail.State.FAILED -> {
+                    Button(onClick = { GlobeDetail.start() }) {
+                        Text(if (GlobeDetail.have > 0) "Carry on" else "Try again")
+                    }
+                    if (GlobeDetail.have > 0) OutlinedButton(onClick = { GlobeDetail.remove() }) { Text("Delete") }
+                }
+                GlobeDetail.State.DOWNLOADING -> OutlinedButton(onClick = { GlobeDetail.pause() }) { Text("Stop") }
+                GlobeDetail.State.CHECKING -> {}
+                GlobeDetail.State.INSTALLED -> OutlinedButton(onClick = { GlobeDetail.remove() }) { Text("Remove") }
+            }
         }
     }
 }

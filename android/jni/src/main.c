@@ -380,6 +380,17 @@ static int step_station(int step)
     return -1;
 }
 
+/* The full-detail packs, downloaded by the app (Kotlin, GlobeDetail) into
+ * globe/ in the files folder. They only appear there once checked. */
+static void load_globe_detail(void)
+{
+    char *day = data_path("globe/earth-day-detail.pack");
+    char *night = data_path("globe/earth-night-detail.pack");
+    earth_set_detail(day, night);
+    SDL_free(day);
+    SDL_free(night);
+}
+
 static void command(int cmd, int arg)
 {
     player_status st;
@@ -447,6 +458,10 @@ static void command(int cmd, int arg)
             player_set_prebuffer(prebuffer_bytes);
             LOG("command: prebuffer %d KB", arg);
         }
+        break;
+    case CMD_GLOBE_DETAIL:
+        LOG("command: globe detail");
+        load_globe_detail();
         break;
     default:
         break;
@@ -750,6 +765,7 @@ int main(int argc, char *argv[])
     hooks.label = bridge_globe_label;
     hooks.tick = bridge_haptic_tick;
     globeview_init(&lib, &cfg, &hooks, "earth-day.pack", "earth-night.pack");
+    load_globe_detail();
     SDL_AddEventWatch(lifecycle, NULL);
     SDL_SetAtomicInt(&lib_ready, 1);
     bridge_library_ready(lib.stations.count);

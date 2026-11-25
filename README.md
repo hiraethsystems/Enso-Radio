@@ -46,8 +46,11 @@ and open it on your phone (Android asks you to allow your browser or file
 manager to install apps). It needs **Android 13 or later** on a 64-bit ARM
 phone or tablet, which is nearly all of them since 2019.
 
-The APK is about 390 MB, almost all of it the globe's imagery, which is kept
-at full detail.
+The APK is about 120 MB, most of it the globe's imagery. For the sharpest
+view when you zoom in close, Settings > Globe > Full detail downloads the
+closest zoom level (254 MB) from this repository's releases. It's only
+downloaded when you ask, checked before it's used, and can be removed again
+in the same place.
 
 ## Your files
 
@@ -81,7 +84,8 @@ Everything builds from the command line on Linux, without Android Studio:
 the Android SDK command-line tools, NDK 28.2.13676358, the Gradle wrapper and
 JDK 21. `NOTES.md` (A0) has the exact versions, and the "Building" section of
 the Android notes has the steps. The globe imagery is made by
-`tools/make_earth.py` and the native libraries by
+`tools/make_earth.py --detail-from 6` (the APK's packs in `build-earth/`,
+the full-detail download in `build-earth-detail/`) and the native libraries by
 `tools/build_android_deps.sh`.
 
 ## Tests
