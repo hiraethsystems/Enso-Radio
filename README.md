@@ -8,7 +8,7 @@ a station list that is yours to keep and edit.
 alt="Ensō Radio on a phone: a satellite view of Ireland and Britain dotted with
 stations, the ring over Dublin playing 8Radio, and the mini player below"></p>
 
-**0.9.0 is a beta.** So far it has been tested on a Samsung Galaxy S25 Ultra
+**0.9.1 is a beta.** So far it has been tested on a Samsung Galaxy S25 Ultra
 (Android 17) and the Android emulator. Please report problems as GitHub
 issues.
 

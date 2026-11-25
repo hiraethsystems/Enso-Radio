@@ -3166,3 +3166,19 @@ here).
   published yet); a download on mobile data or with the app in the
   background for long (a long download may stop if Android stops the app;
   Carry on resumes it); the release build on the phone.
+
+## Release 0.9.1 (beta), build 24 (2026-11-25)
+
+- The first release under the name Ensō Radio and the app ID
+  `systems.hiraeth.ensoradio`, with the new icon and the smaller APK (full
+  detail as the `globe-1` download). Same features as 0.9.0.
+- **The APK:** `ensoradio-0.9.1-b24-release.apk`, 117,296,541 bytes,
+  arm64-v8a only, versionCode 24, signed with the 0.9.0 certificate.
+  - SHA-256 `50c5c4474938c235789c5816b8feb7ae67712d2426cda7510a391ad59b61c0be`.
+  - `zipalign -c -P 16` passes; both native libraries have 16 KB LOAD
+    alignment; `libmain.so` has no build ID and no build paths.
+- **Checked:** the real `globe-1` download from GitHub on the emulator
+  (35 s, both files checked, levels 0-6 at once); build 23 with the download
+  tested on the phone by Aisling.
+- 0.9.0 has a different app ID, so 0.9.1 installs beside it, not over it.
+  The release notes and README say how to copy files across.
