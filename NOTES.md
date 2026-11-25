@@ -828,6 +828,52 @@ used (its current version also needs SDK 37).
   Dual Messenger profile by `adb install`; removed with `pm uninstall
   --user 95`, and installs now use `--user 0` (see Testing).
 
+## Release 0.9.0 (beta), build 19, 2026-11-25
+
+Aisling asked for a release before A5, as a full (not pre-) release on
+GitHub, tagged `android-v0.9.0`. Adding stations, playlists and Download
+Station List (A5) and F-Droid (A7) come later; the README and release
+notes say so.
+
+- **Signing:**
+  - Aisling's own key, made with `tools/make_release_key.sh`: PKCS12,
+    RSA 4096, alias `dxgarden`, valid 100 years.
+  - It lives in `~/.config/dxgarden/`, with `signing.properties` beside
+    it, readable only by her. Neither file is ever committed.
+  - Gradle reads them, or the file named by `DXG_SIGNING_PROPERTIES`.
+    Without them the release APK is built unsigned.
+  - Certificate SHA-256:
+    `94:46:1C:2A:ED:7B:01:DE:AB:21:CC:12:DA:35:3A:35:ED:F1:57:08:5D:22:0E:33:3D:5C:E0:C2:F0:D8:9F:B0`.
+  - **That key must be kept:** every later release has to be signed with
+    it, or Android won't update installed copies.
+- **The APK:** `dxgarden-0.9.0-b19-release.apk`, 392,197,944 bytes,
+  arm64-v8a only, APK signature scheme v2.
+  - SHA-256 `99897714c5efd5d02071e4a860a98d755cb0a9e701360236c5160ed72ab2989f`.
+  - `zipalign -c -P 16` passes.
+  - Both native libraries have 16 KB LOAD alignment.
+  - `libmain.so` has no build ID and no build paths.
+  - Compose adds AndroidX's prebuilt `libandroidx.graphics.path.so`.
+- **R8 (shrinking) is off:** JNI calls into Kotlin by name
+  (`setGlobeLabel`, `playbackUpdate`, `Native`, SDL's classes), and keep
+  rules for them couldn't be tested before this release. Turning it on
+  would take about 25 MB of Compose code out of the APK; worth doing with
+  keep rules in A6.
+- **Not run before publishing:** the release build is arm64 only, so it
+  can't run on the x86_64 emulator, and the phone was off adb. Builds 16
+  to 18 (debug, same code) ran on the phone and emulator. A release build
+  differs in its signature and in ignoring the test options.
+- **README:**
+  - A screenshot (`docs/screenshot-android.png`): the emulator over
+    Ireland, Sun fixed with `--time`, 8Radio playing, demo-mode status
+    bar.
+  - Sections on what the app does, installing, your files and what's not
+    there yet.
+- **Repo description:** "DX Garden for Android: spin a globe and listen to
+  live radio from your own station list".
+- **Installing over the debug builds:** the debug builds are signed with
+  the debug key, so the phone must uninstall them before installing the
+  release. That deletes the files folder, favourites included.
+
 ---
 
 (The Linux and Vita notes follow, unchanged from DX-Garden-Linux.)
