@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 
-# DX Garden for Android, the PC side:
+# Ensō Radio for Android, the PC side:
 #   cmake -S . -B build-test -DDXG_APP=OFF        core/ unit tests and the list tool
 # The app itself is built with Gradle from android/ (./gradlew assembleDebug).
-project(dxgarden C)
+project(ensoradio C)
 
 # Versions, in android/ (also read by Gradle for versionName and versionCode):
 #   VERSION  the release version, MAJOR.MINOR.PATCH, minor and patch 0-9.
@@ -37,7 +37,7 @@ if(DXG_APP)
 endif()
 
 find_package(ZLIB REQUIRED)
-add_executable(dxgarden_test
+add_executable(ensoradio_test
     ${CORE_SOURCES}
     ${RB_SOURCES}
     tests/test_rb.c
@@ -51,13 +51,13 @@ add_executable(dxgarden_test
     tests/test_hls.c
     tests/test_sun.c
 )
-target_include_directories(dxgarden_test PRIVATE core)
+target_include_directories(ensoradio_test PRIVATE core)
 # Where the tests read testdata/ from. tools/android_test.sh builds with
 # the folder it pushes testdata/ to on the device.
 set(DXG_TESTDATA_DIR "${CMAKE_SOURCE_DIR}/testdata" CACHE STRING "testdata/ at run time")
-target_compile_definitions(dxgarden_test PRIVATE
+target_compile_definitions(ensoradio_test PRIVATE
                            DXG_TESTDATA_DIR="${DXG_TESTDATA_DIR}")
-target_compile_options(dxgarden_test PRIVATE -Wall -Wextra -Wpedantic -g)
+target_compile_options(ensoradio_test PRIVATE -Wall -Wextra -Wpedantic -g)
 # AddressSanitizer and UBSan on the PC. Off for the NDK build: an ASan
 # executable on Android needs its runtime pushed alongside it.
 if(ANDROID)
@@ -67,17 +67,17 @@ else()
 endif()
 option(DXG_SANITIZE "Build the tests with ASan and UBSan" ${DXG_SANITIZE_DEFAULT})
 if(DXG_SANITIZE)
-    target_compile_options(dxgarden_test PRIVATE -fsanitize=address,undefined)
-    target_link_options(dxgarden_test PRIVATE -fsanitize=address,undefined)
+    target_compile_options(ensoradio_test PRIVATE -fsanitize=address,undefined)
+    target_link_options(ensoradio_test PRIVATE -fsanitize=address,undefined)
 endif()
-target_link_libraries(dxgarden_test ZLIB::ZLIB m)
+target_link_libraries(ensoradio_test ZLIB::ZLIB m)
 
 # The station-list builder from the command line, to compare it with
 # tools/rb_to_stations.py (tests/compare_listtool.sh).
-add_executable(dxgarden_listtool ${CORE_SOURCES} ${RB_SOURCES} tests/listtool.c)
-target_include_directories(dxgarden_listtool PRIVATE core)
-target_compile_options(dxgarden_listtool PRIVATE -Wall -Wextra -O2 -g)
-target_link_libraries(dxgarden_listtool ZLIB::ZLIB m)
+add_executable(ensoradio_listtool ${CORE_SOURCES} ${RB_SOURCES} tests/listtool.c)
+target_include_directories(ensoradio_listtool PRIVATE core)
+target_compile_options(ensoradio_listtool PRIVATE -Wall -Wextra -O2 -g)
+target_link_libraries(ensoradio_listtool ZLIB::ZLIB m)
 
 enable_testing()
-add_test(NAME core COMMAND dxgarden_test)
+add_test(NAME core COMMAND ensoradio_test)

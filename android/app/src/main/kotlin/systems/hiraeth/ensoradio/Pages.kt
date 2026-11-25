@@ -1,4 +1,4 @@
-package systems.hiraeth.dxgarden
+package systems.hiraeth.ensoradio
 
 import android.content.Intent
 import android.net.Uri
@@ -295,7 +295,7 @@ fun SettingsPage() {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             SectionTitle("Colours")
             Column(Modifier.selectableGroup()) {
-                Choice("DX Garden", "Night blue and amber", Prefs.colours == Prefs.COLOURS_DXG) { Prefs.changeColours(Prefs.COLOURS_DXG) }
+                Choice("Ensō Radio", "Night blue and amber", Prefs.colours == Prefs.COLOURS_DXG) { Prefs.changeColours(Prefs.COLOURS_DXG) }
                 Choice("Your phone's colours", "From your wallpaper (Material You)", Prefs.colours == Prefs.COLOURS_PHONE) {
                     Prefs.changeColours(Prefs.COLOURS_PHONE)
                 }
@@ -332,7 +332,7 @@ fun SettingsPage() {
             SectionTitle("Your files")
             Text(
                 "Your station list (stations.txt), favourites and recent stations are in " +
-                    "Android/data/systems.hiraeth.dxgarden/files on the phone's storage, where a computer " +
+                    "Android/data/systems.hiraeth.ensoradio/files on the phone's storage, where a computer " +
                     "can reach them over USB.",
                 Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.bodyMedium,
@@ -355,7 +355,7 @@ fun AboutPage() {
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
         PageTop("About")
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
-            Text("DX Garden", style = MaterialTheme.typography.displaySmall)
+            Text("Ensō Radio", style = MaterialTheme.typography.displaySmall)
             Text(
                 "Version ${AppInfo.version} · build ${AppInfo.build}",
                 style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -407,7 +407,7 @@ fun AboutPage() {
                 modifier = Modifier.padding(top = 28.dp, bottom = 6.dp).semantics { heading() },
             )
             val credits = listOf(
-                "DX Garden is free software under the GNU GPL v3. Source: github.com/hiraethsystems/DX-Garden-Android",
+                "Ensō Radio is free software under the GNU GPL v3. Source: github.com/hiraethsystems/Enso-Radio",
                 "Stations from Radio Browser (radio-browser.info). Place names from GeoNames (CC BY 4.0).",
                 "Globe imagery from NASA: Blue Marble Next Generation (Reto Stöckli, NASA Earth Observatory) and " +
                     "Black Marble 2016 (Joshua Stevens, NASA Earth Observatory; Suomi NPP VIIRS data, Miguel Román, " +

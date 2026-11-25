@@ -3073,3 +3073,29 @@ here).
   replaced by a Linux one.
 - Linux 0.9.2 (build 47) is this repository's first release, tagged
   `linux-v0.9.2`. Linux 0.9.1 stays a release of the DX-Garden repository.
+
+## Renamed to Ensō Radio, 2026-11-25
+
+- **Owner's decision (2026-11-25):** DX Garden is now **Ensō Radio** on
+  every platform. Radio Garden holds registered trade marks for "Radio
+  Garden" (EU, classes 9, 38 and 41; Benelux, class 9), and "Garden" in a
+  globe radio app's name was too close. Repository: `hiraethsystems/Enso-Radio`
+  (was `DX-Garden-Android`).
+- **Full rename:** application ID and namespace `systems.hiraeth.ensoradio`
+  (Kotlin sources moved to `kotlin/systems/hiraeth/ensoradio/`, JNI
+  functions now `Java_systems_hiraeth_ensoradio_…`), app name "Ensō Radio",
+  APKs `ensoradio-<version>-b<build>-<type>.apk`, Gradle project and CMake
+  targets `ensoradio…`, logcat tag, wake/Wi-Fi lock and MediaSession tags
+  `EnsoRadio`, user agents `EnsoRadio/<version> (…)` and
+  `ensoradio-tools/<version>`, and every name in the interface, messages,
+  file headers, README, CLAUDE.md and the test scripts.
+- **No data migration on Android:** a new application ID is a new app, and
+  Android doesn't let it read `Android/data/systems.hiraeth.dxgarden/`.
+  0.9.0 users who changed their files copy them over USB (README says how).
+  0.9.0 went out minutes before the rename, so few people are affected.
+- **Kept:** the release signing key's folder and alias
+  (`~/.config/dxgarden/`, alias `dxgarden`), so the existing key signs
+  Ensō Radio without changes; the `DXG_` macros; the dated header of the
+  bundled station list.
+- Build 20.
+

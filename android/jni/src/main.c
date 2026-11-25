@@ -1,5 +1,5 @@
 /*
- * DX Garden for Android, native side.
+ * Ensō Radio for Android, native side.
  *
  * A2: the globe (OpenGL ES 3) with the bundled station list. Hold the
  * crosshair over a place and it plays.
@@ -8,7 +8,7 @@
  * headset buttons. In the background nothing is drawn: the loop only keeps
  * the player going and answers commands. The log goes to
  * log-<version>-b<build>.txt in the app's external files folder and to
- * logcat (tag DXGarden).
+ * logcat (tag EnsoRadio).
  *
  * Test options, from intent extras in debuggable builds (MainActivity):
  *   --play URL        play this stream and nothing else (A1's test)
@@ -327,7 +327,7 @@ static int playing_station(void)
 
 /* From any thread (Playback.kt, on Android's main thread): queue a command
  * for the loop, which takes it within 100 ms even in the background. */
-JNIEXPORT void JNICALL Java_systems_hiraeth_dxgarden_Playback_nativeCommand(JNIEnv *env, jclass cls,
+JNIEXPORT void JNICALL Java_systems_hiraeth_ensoradio_Playback_nativeCommand(JNIEnv *env, jclass cls,
                                                                             jint cmd)
 {
     (void)env;
@@ -692,7 +692,7 @@ int main(int argc, char *argv[])
     /* Keep running when the app is paused (in the background, or the screen
      * off), so the player goes on; audio isn't paused either. */
     SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "0");
-    SDL_SetAppMetadata("DX Garden", DXG_VERSION, "systems.hiraeth.dxgarden");
+    SDL_SetAppMetadata("Ensō Radio", DXG_VERSION, "systems.hiraeth.ensoradio");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return 1;
@@ -701,7 +701,7 @@ int main(int argc, char *argv[])
     lists_lock = SDL_CreateMutex();
     dir = data_dir();
     open_log();
-    LOG("DX Garden %s (build %s), Android (API %d), SDL %d.%d.%d, data in %s", DXG_VERSION,
+    LOG("Ensō Radio %s (build %s), Android (API %d), SDL %d.%d.%d, data in %s", DXG_VERSION,
         DXG_BUILD, SDL_GetAndroidSDKVersion(), SDL_VERSIONNUM_MAJOR(SDL_GetVersion()),
         SDL_VERSIONNUM_MINOR(SDL_GetVersion()), SDL_VERSIONNUM_MICRO(SDL_GetVersion()), dir);
     LOG("audio: driver %s", SDL_GetCurrentAudioDriver());
@@ -728,7 +728,7 @@ int main(int argc, char *argv[])
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
     /* Not SDL_WINDOW_FULLSCREEN: that hides the system bars (immersive
      * mode). The app is edge to edge instead, with the bars over the globe. */
-    win = SDL_CreateWindow("DX Garden", 0, 0, SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+    win = SDL_CreateWindow("Ensō Radio", 0, 0, SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     gl = win ? SDL_GL_CreateContext(win) : NULL;
     if (!gl) {
         LOG("window or GL context failed: %s", SDL_GetError());

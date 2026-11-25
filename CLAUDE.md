@@ -1,16 +1,18 @@
-# Project brief: DX Garden for Android
+# Project brief: Ensō Radio for Android
 
-Name: **DX Garden**. Repository: `hiraethsystems/DX-Garden-Android`. Application ID: `systems.hiraeth.dxgarden`. Internal/folder name: `dxgarden`.
+Name: **Ensō Radio**. Repository: `hiraethsystems/Enso-Radio`. Application ID: `systems.hiraeth.ensoradio`. Internal/folder name: `ensoradio`.
+
+Renamed from DX Garden on 2026-11-25 (my decision: Radio Garden holds "Radio Garden" trade marks, and "Garden" was too close). 0.9.0 was released as `systems.hiraeth.dxgarden` from `hiraethsystems/DX-Garden-Android`. The release signing key keeps its old place and alias (`~/.config/dxgarden/`, alias `dxgarden`): don't move or rename them. Use "Ensō Radio" for anything a user sees.
 
 ## What this is
 
-A Radio Garden style radio explorer for Android phones and tablets: spin a globe, hold the crosshair over a place, and hear live radio from there. It is a port of DX Garden for Linux (`hiraethsystems/DX-Garden-Linux`), which itself grew out of the PS Vita app (`hiraethsystems/DX-Garden`, frozen).
+A Radio Garden style radio explorer for Android phones and tablets: spin a globe, hold the crosshair over a place, and hear live radio from there. It is a port of Ensō Radio for Linux (`hiraethsystems/Enso-Radio-Linux`), which itself grew out of the PS Vita app (`hiraethsystems/Enso-Radio-Vita`, frozen).
 
 It should feel like Radio Garden to use, but with its own visual identity. Do not copy Radio Garden's artwork, logo, colours, icons or text. There is no Windows 9x look on Android: the interface is modern Android (Material 3), described in `NOTES.md` under "Interface".
 
 ## Where it came from (my decision, 2026-11-24)
 
-This repository was made from `hiraethsystems/DX-Garden-Linux` with its history, keeping `core/`, `tests/`, `testdata/`, `tools/` (minus the AppImage scripts), `assets/fonts/` and the docs, and leaving out the Linux app (`linux/`, `cmake/linux.cmake`, `tools/make_appimage.sh`, `tools/build_linux_deps.sh`). `core/` here is the Android app's own copy and may change freely. Keep it portable C99, with no SDL, OpenGL or JNI, and keep its unit tests passing on the PC.
+This repository was made from `hiraethsystems/Enso-Radio-Linux` with its history, keeping `core/`, `tests/`, `testdata/`, `tools/` (minus the AppImage scripts), `assets/fonts/` and the docs, and leaving out the Linux app (`linux/`, `cmake/linux.cmake`, `tools/make_appimage.sh`, `tools/build_linux_deps.sh`). `core/` here is the Android app's own copy and may change freely. Keep it portable C99, with no SDL, OpenGL or JNI, and keep its unit tests passing on the PC.
 
 I will test builds on my phone (Samsung Galaxy S25 Ultra) and report back. Work through the milestones in `NOTES.md` in order, in one continuous run. At the end of each milestone, check everything you can headless, write the milestone's section in `NOTES.md`, commit, and carry straight on to the next one. Stop and wait for me only:
 
@@ -38,8 +40,8 @@ All work happens on my main PC, **Saoirse** (Debian). Never assume Android Studi
 As on Linux:
 
 - The app ships a bundled station list (`assets/stations/android/stations.txt`), one dated snapshot of Radio Browser made with `tools/rb_to_stations.py --bundle <version>`, every format the app plays, HLS included, stations without coordinates placed as in `NOTES.md` (F6). On first run it becomes the user's `stations.txt`; the app never overwrites an existing one.
-- The user's files live in the app's external files folder, `Android/data/systems.hiraeth.dxgarden/files/`, which a computer can reach over USB. Most users will only use the bundled list; anyone who wants to edit `stations.txt` or drop M3U/PLS files into `import/` does it from a computer over USB. No file picker or import/export screens are needed.
-- Add station by URL, and "Open with DX Garden" for M3U, M3U8 and PLS files and links.
+- The user's files live in the app's external files folder, `Android/data/systems.hiraeth.ensoradio/files/`, which a computer can reach over USB. Most users will only use the bundled list; anyone who wants to edit `stations.txt` or drop M3U/PLS files into `import/` does it from a computer over USB. No file picker or import/export screens are needed.
+- Add station by URL, and "Open with Ensō Radio" for M3U, M3U8 and PLS files and links.
 
 **One directory is allowed: Radio Browser (radio-browser.info).** Download Station List works as on Linux (`core/rb_build.c`, the same lines as `tools/rb_to_stations.py`, checked by `tests/compare_listtool.sh`): only when the user asks, never in the background.
 
@@ -55,7 +57,7 @@ The globe must be as detailed and good-looking as we can make it. Do not cut ima
 
 ## Architecture
 
-- `core/`: portable C99 as above. Unit tests in `tests/` (`dxgarden_test`), built on the PC without SDL, and also cross-built with the NDK and run on the emulator and phone over adb.
+- `core/`: portable C99 as above. Unit tests in `tests/` (`ensoradio_test`), built on the PC without SDL, and also cross-built with the NDK and run on the emulator and phone over adb.
 - `android/jni/`: the native app on SDL3: OpenGL ES 3 globe, decoders (mpg123, faad2, Vorbis, Opus, FLAC), libcurl with Mbed TLS, HarfBuzz/FreeType/FriBidi where native text is still needed, and the JNI bridge.
 - `android/app/`: Kotlin. `MainActivity` (SDL's activity), the interface in Jetpack Compose (Material 3) drawn over the SDL surface, and the playback service (foreground service of type `mediaPlayback`, MediaSession, notification, audio focus).
 - `tools/`: `build_android_deps.sh` (the libraries for each ABI, pinned versions and SHA-256 sums), `make_earth.py`, `rb_to_stations.py`, font and Unicode table generators.

@@ -1,4 +1,4 @@
-package systems.hiraeth.dxgarden
+package systems.hiraeth.ensoradio
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement

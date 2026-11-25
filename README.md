@@ -1,21 +1,23 @@
-# DX Garden for Android
+# Ensō Radio for Android
 
-DX Garden is a radio explorer: spin the globe, hold the ring over a place,
+*Formerly DX Garden (renamed 2026-11-25).*
+
+Ensō Radio is a radio explorer: spin the globe, hold the ring over a place,
 and hear what's on air there. It's a player for internet radio streams, with
 a station list that is yours to keep and edit.
 
 <p align="center"><img src="docs/screenshot-android.png" width="300"
-alt="DX Garden on a phone: a satellite view of Ireland and Britain dotted with
+alt="Ensō Radio on a phone: a satellite view of Ireland and Britain dotted with
 stations, the ring over Dublin playing 8Radio, and the mini player below"></p>
 
 **0.9.0 is a beta.** So far it has been tested on a Samsung Galaxy S25 Ultra
 (Android 17) and the Android emulator. Please report problems as GitHub
 issues.
 
-DX Garden started on the PS Vita
-([hiraethsystems/DX-Garden](https://github.com/hiraethsystems/DX-Garden),
+Ensō Radio started on the PS Vita
+([hiraethsystems/Enso-Radio-Vita](https://github.com/hiraethsystems/Enso-Radio-Vita),
 frozen) and then came to the Linux desktop
-([hiraethsystems/DX-Garden-Linux](https://github.com/hiraethsystems/DX-Garden-Linux)).
+([hiraethsystems/Enso-Radio-Linux](https://github.com/hiraethsystems/Enso-Radio-Linux)).
 This repository was split from the Linux one with its history, and keeps the
 shared portable C code in `core/`. The apps share a station-file format but
 are developed and released separately.
@@ -41,7 +43,7 @@ are developed and released separately.
 
 ## Installing
 
-Download the APK from [Releases](https://github.com/hiraethsystems/DX-Garden-Android/releases)
+Download the APK from [Releases](https://github.com/hiraethsystems/Enso-Radio/releases)
 and open it on your phone (Android asks you to allow your browser or file
 manager to install apps). It needs **Android 13 or later** on a 64-bit ARM
 phone or tablet, which is nearly all of them since 2019.
@@ -52,16 +54,25 @@ at full detail.
 ## Your files
 
 Your station list (`stations.txt`), favourites and recent stations are in
-`Android/data/systems.hiraeth.dxgarden/files/` on the phone's storage, where
+`Android/data/systems.hiraeth.ensoradio/files/` on the phone's storage, where
 a computer can reach them over USB. The app copies its included list there
 the first time it starts and never overwrites it afterwards, so your edits
 are kept. Android deletes that folder when the app is uninstalled, so copy
 your files off first.
 
+**Updating from DX Garden 0.9.0:** the app ID changed with the name
+(`systems.hiraeth.dxgarden` is now `systems.hiraeth.ensoradio`), so Ensō
+Radio installs as a new app beside DX Garden rather than over it, and
+Android doesn't let one app read another's folder. If you changed
+`stations.txt` or have favourites, copy
+`Android/data/systems.hiraeth.dxgarden/files/` over USB into
+`Android/data/systems.hiraeth.ensoradio/files/` (start Ensō Radio once
+first so the folder exists), then uninstall DX Garden.
+
 ## Not yet
 
-- Adding a station by its address, opening M3U and PLS playlists with DX
-  Garden, and Download Station List (a fresh list from Radio Browser, when
+- Adding a station by its address, opening M3U and PLS playlists with Ensō
+  Radio, and Download Station List (a fresh list from Radio Browser, when
   you ask). For now, edit `stations.txt` from a computer.
 - F-Droid. Releases are here on GitHub for now.
 
@@ -82,7 +93,7 @@ the Android notes has the steps. The globe imagery is made by
 unit tests that need only a C compiler and zlib:
 
 ```sh
-cmake -S . -B build-test -DDXG_APP=OFF && cmake --build build-test && ./build-test/dxgarden_test
+cmake -S . -B build-test -DDXG_APP=OFF && cmake --build build-test && ./build-test/ensoradio_test
 python3 -I tools/test_rb_to_stations.py
 ```
 
@@ -91,7 +102,7 @@ python3 -I tools/test_rb_to_stations.py
 
 ## Credits and licences
 
-- DX Garden is licensed under the GNU GPL v3 (see `LICENSE`).
+- Ensō Radio is licensed under the GNU GPL v3 (see `LICENSE`).
 - Linked into the app: SDL3 (zlib licence), libcurl (curl licence),
   Mbed TLS (Apache 2.0), mpg123 (LGPL 2.1), faad2 (GPL 2 or later),
   libogg, libvorbis, Opus, opusfile and libFLAC (BSD), FreeType (FreeType

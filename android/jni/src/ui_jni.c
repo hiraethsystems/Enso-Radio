@@ -15,7 +15,7 @@
 #include "player.h"
 #include "search.h"
 
-#define JNI_FN(name) Java_systems_hiraeth_dxgarden_Native_##name
+#define JNI_FN(name) Java_systems_hiraeth_ensoradio_Native_##name
 
 static jobjectArray strings(JNIEnv *env, const char **v, int n)
 {

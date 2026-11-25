@@ -1,4 +1,4 @@
-package systems.hiraeth.dxgarden
+package systems.hiraeth.ensoradio
 
 import android.app.Service
 import android.content.Intent
@@ -22,7 +22,7 @@ class PlaybackService : Service() {
             )
         } catch (e: RuntimeException) {
             // E.g. started from the background without being allowed to.
-            Log.w("DXGarden", "playback: could not start in the foreground: $e")
+            Log.w("EnsoRadio", "playback: could not start in the foreground: $e")
             stopSelf()
         }
         // If the system kills the process, don't restart the service on its

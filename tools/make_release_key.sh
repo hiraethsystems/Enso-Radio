@@ -1,10 +1,10 @@
 #!/bin/bash
-# Makes DX Garden's release signing key, once, outside the repository:
+# Makes Ensō Radio's release signing key, once, outside the repository:
 #   ~/.config/dxgarden/release.jks          the key (PKCS12, RSA 4096, 100 years)
 #   ~/.config/dxgarden/signing.properties   where it is and its password,
 #                                           read by android/app/build.gradle.kts
 # Both are readable only by you and are never committed. Back them up
-# somewhere safe: without this key, an installed DX Garden can't be updated
+# somewhere safe: without this key, an installed Ensō Radio can't be updated
 # by a new release (Android would make users uninstall first).
 set -euo pipefail
 
@@ -43,7 +43,7 @@ keytool -genkeypair -keystore "$ks" -storetype PKCS12 -alias dxgarden \
 # Java properties: backslashes must be doubled.
 esc=${pw//\\/\\\\}
 {
-    echo "# DX Garden release signing. Never commit this file."
+    echo "# Ensō Radio release signing. Never commit this file."
     echo "storeFile=$ks"
     echo "storePassword=$esc"
     echo "keyAlias=dxgarden"

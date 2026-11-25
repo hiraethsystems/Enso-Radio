@@ -8,7 +8,7 @@
 # SDL3, curl (HTTP and HTTPS only, with Mbed TLS), mpg123, faad2 (AAC), Ogg,
 # Vorbis, Opus, opusfile, FLAC, zlib, FreeType, HarfBuzz and FriBidi: the
 # same libraries and versions as the Linux app's tools/build_linux_deps.sh
-# (in DX-Garden-Linux), built with the pinned NDK for min SDK 33.
+# (in Enso-Radio-Linux), built with the pinned NDK for min SDK 33.
 #
 # 16 KB pages: the NDK (r28) and the -z max-page-size flags below align
 # everything for 16 KB; the libraries are static, so what matters is the
