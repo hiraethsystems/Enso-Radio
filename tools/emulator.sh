@@ -4,21 +4,21 @@
 #   tools/emulator.sh stop    shut it down
 #   tools/emulator.sh status  print the serial if it is running
 #   tools/emulator.sh create  make the AVD (Pixel 8, Android 16, 16 KB pages)
-# Afterwards use: adb -s "emulator-$DXG_EMU_PORT" ...
+# Afterwards use: adb -s "emulator-$ENSO_EMU_PORT" ...
 set -eu
 . "$(dirname "$0")/android_env.sh"
-SERIAL="emulator-$DXG_EMU_PORT"
-LOG="${TMPDIR:-/tmp}/dxg-emulator.log"
+SERIAL="emulator-$ENSO_EMU_PORT"
+LOG="${TMPDIR:-/tmp}/ensoradio-emulator.log"
 
 running() { adb devices | grep -q "^$SERIAL[[:space:]]"; }
 
 case "${1:-}" in
 create)
-    echo no | avdmanager create avd -n "$DXG_AVD" -k "$DXG_AVD_IMAGE" -d pixel_8 --force
+    echo no | avdmanager create avd -n "$ENSO_AVD" -k "$ENSO_AVD_IMAGE" -d pixel_8 --force
     ;;
 start)
     if running; then echo "$SERIAL already running"; exit 0; fi
-    nohup emulator -avd "$DXG_AVD" -port "$DXG_EMU_PORT" -no-window \
+    nohup emulator -avd "$ENSO_AVD" -port "$ENSO_EMU_PORT" -no-window \
         -gpu swiftshader_indirect -no-audio -no-boot-anim -no-snapshot \
         >"$LOG" 2>&1 &
     adb -s "$SERIAL" wait-for-device

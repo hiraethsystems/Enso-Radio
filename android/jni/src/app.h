@@ -1,8 +1,8 @@
 /* What main.c shares with the interface's JNI functions (ui_jni.c).
  * The library is read-only once loaded, so any thread may read it after
  * app_library() returns it. Favourites and recent are behind a lock. */
-#ifndef DXG_APP_H
-#define DXG_APP_H
+#ifndef ENSO_APP_H
+#define ENSO_APP_H
 
 #include "library.h"
 

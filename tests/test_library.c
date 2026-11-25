@@ -518,7 +518,7 @@ static void test_sources(void)
     const char *base = getenv("TMPDIR");
     if (!base || !*base)
         base = "/tmp";
-    snprintf(tmpdir, sizeof(tmpdir), "%s/dxg_test_XXXXXX", base);
+    snprintf(tmpdir, sizeof(tmpdir), "%s/enso_test_XXXXXX", base);
     if (!mkdtemp(tmpdir)) {
         CHECK(!"mkdtemp failed");
         return;
@@ -550,7 +550,7 @@ static void test_sources(void)
     CHECK(report_has(&r, "missing.txt: file not found"));
     station_source_destroy(src);
 
-    src = playlist_dir_source_new("/nonexistent/dxg", posix_list);
+    src = playlist_dir_source_new("/nonexistent/ensoradio", posix_list);
     CHECK(src && src->load(src, &l, &r) == 0);
     station_source_destroy(src);
 

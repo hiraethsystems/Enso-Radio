@@ -17,7 +17,7 @@ import androidx.compose.ui.platform.LocalContext
  * phone's Material You colours, if chosen in Settings.
  */
 
-private val DxgDark = darkColorScheme(
+private val EnsoDark = darkColorScheme(
     primary = Color(0xFFF4B04A),
     onPrimary = Color(0xFF3A2300),
     primaryContainer = Color(0xFF5A3A00),
@@ -43,7 +43,7 @@ private val DxgDark = darkColorScheme(
     outlineVariant = Color(0xFF3A4252),
 )
 
-private val DxgLight = lightColorScheme(
+private val EnsoLight = lightColorScheme(
     primary = Color(0xFF825500),
     onPrimary = Color(0xFFFFFFFF),
     primaryContainer = Color(0xFFFFDDAF),
@@ -69,7 +69,7 @@ private val DxgLight = lightColorScheme(
 )
 
 @Composable
-fun DxgTheme(content: @Composable () -> Unit) {
+fun EnsoTheme(content: @Composable () -> Unit) {
     val dark = when (Prefs.theme) {
         Prefs.THEME_LIGHT -> false
         Prefs.THEME_DARK -> true
@@ -79,7 +79,7 @@ fun DxgTheme(content: @Composable () -> Unit) {
     val scheme: ColorScheme = if (Prefs.colours == Prefs.COLOURS_PHONE) {
         if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     } else {
-        if (dark) DxgDark else DxgLight
+        if (dark) EnsoDark else EnsoLight
     }
     MaterialTheme(colorScheme = scheme, content = content)
 }

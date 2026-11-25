@@ -6,8 +6,8 @@
  * with momentum when flung; pinch zooms; double-tap zooms in where tapped;
  * two-finger tap zooms out; a tap on a dot plays that place.
  */
-#ifndef DXG_GLOBE_VIEW_H
-#define DXG_GLOBE_VIEW_H
+#ifndef ENSO_GLOBE_VIEW_H
+#define ENSO_GLOBE_VIEW_H
 
 #include <SDL3/SDL.h>
 

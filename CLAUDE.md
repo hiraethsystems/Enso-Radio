@@ -2,7 +2,7 @@
 
 Name: **Ensō Radio**. Repository: `hiraethsystems/Enso-Radio`. Application ID: `systems.hiraeth.ensoradio`. Internal/folder name: `ensoradio`.
 
-Renamed from DX Garden on 2026-11-25 (my decision: Radio Garden holds "Radio Garden" trade marks, and "Garden" was too close). 0.9.0 was released as `systems.hiraeth.dxgarden` from `hiraethsystems/DX-Garden-Android`. The release signing key keeps its old place and alias (`~/.config/dxgarden/`, alias `dxgarden`): don't move or rename them. Use "Ensō Radio" for anything a user sees.
+The name was chosen on 2026-11-25 (my decision: Radio Garden holds "Radio Garden" trade marks, so keep clearly apart from it). 0.9.0 went out under an earlier app ID, `systems.hiraeth.dxgarden`; mention it only where users need it to find their old files. The release signing key is in `~/.config/ensoradio/`, alias `ensoradio`. Use "Ensō Radio" for anything a user sees, and "Enso Radio" only where ō can't be displayed.
 
 ## What this is
 

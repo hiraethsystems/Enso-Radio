@@ -1,7 +1,5 @@
 # Ensō Radio for Android
 
-*Formerly DX Garden (renamed 2026-11-25).*
-
 Ensō Radio is a radio explorer: spin the globe, hold the ring over a place,
 and hear what's on air there. It's a player for internet radio streams, with
 a station list that is yours to keep and edit.
@@ -60,14 +58,13 @@ the first time it starts and never overwrites it afterwards, so your edits
 are kept. Android deletes that folder when the app is uninstalled, so copy
 your files off first.
 
-**Updating from DX Garden 0.9.0:** the app ID changed with the name
-(`systems.hiraeth.dxgarden` is now `systems.hiraeth.ensoradio`), so Ensō
-Radio installs as a new app beside DX Garden rather than over it, and
-Android doesn't let one app read another's folder. If you changed
-`stations.txt` or have favourites, copy
+**Updating from 0.9.0:** 0.9.0 had a different app ID
+(`systems.hiraeth.dxgarden`), so this version installs as a new app beside
+it rather than over it, and Android doesn't let one app read another's
+folder. If you changed `stations.txt` or have favourites, copy
 `Android/data/systems.hiraeth.dxgarden/files/` over USB into
-`Android/data/systems.hiraeth.ensoradio/files/` (start Ensō Radio once
-first so the folder exists), then uninstall DX Garden.
+`Android/data/systems.hiraeth.ensoradio/files/` (start the new version once
+first so the folder exists), then uninstall 0.9.0.
 
 ## Not yet
 
@@ -93,7 +90,7 @@ the Android notes has the steps. The globe imagery is made by
 unit tests that need only a C compiler and zlib:
 
 ```sh
-cmake -S . -B build-test -DDXG_APP=OFF && cmake --build build-test && ./build-test/ensoradio_test
+cmake -S . -B build-test -DENSO_APP=OFF && cmake --build build-test && ./build-test/ensoradio_test
 python3 -I tools/test_rb_to_stations.py
 ```
 

@@ -195,7 +195,7 @@ static int open_pack(int layer, const char *path)
     if (!f)
         return -1;
     if (SDL_SeekIO(f, -20, SDL_IO_SEEK_END) < 0 || SDL_ReadIO(f, foot, 20) != 20 ||
-        memcmp(foot + 12, "DXGP", 4) != 0) {
+        memcmp(foot + 12, "ENSO", 4) != 0) {
         SDL_CloseIO(f);
         return -1;
     }
@@ -776,7 +776,7 @@ int earth_init(const char *day_path, const char *night_path)
     qlock = SDL_CreateMutex();
     qcond = SDL_CreateCondition();
     for (i = 0; i < WORKERS; i++)
-        workers[i] = SDL_CreateThread(worker, "dxg_tiles", NULL);
+        workers[i] = SDL_CreateThread(worker, "enso_tiles", NULL);
     return 0;
 }
 
